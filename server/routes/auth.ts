@@ -1056,25 +1056,10 @@ export function requireTellerForWindowParam(paramName: string): RequestHandler {
 }
 
 export const switchRole: RequestHandler = async (req, res) => {
-  const cookies = parseCookies(req.headers.cookie || "");
-  const token = cookies[SESSION_COOKIE];
-  if (!token)
-    return res.status(401).json({
-      error: "Not authenticated",
-      message: "Please sign in first.",
-      code: "NO_SESSION",
-    });
+  const authResult = await authenticateRequest(req, res, { touch: true });
+  if (!authResult.ok) return respondWithAuthError(res, authResult);
 
-  const session = await findSessionByToken(token);
-  if (!session || session.revokedAt) {
-    res.setHeader("Set-Cookie", buildSessionClearCookie());
-    return res.json({
-      error: "Session invalid",
-      message: "Your session has expired. Please sign in again.",
-      code: "SESSION_INVALIDATED",
-    });
-  }
-
+  const { session, token } = authResult;
   const body = (req.body || {}) as { role?: string };
   const desiredRole = (body.role || "").trim() as UserRole;
 
