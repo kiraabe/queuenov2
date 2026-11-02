@@ -1,16 +1,20 @@
 import { RequestHandler } from "express";
 import { ValidateLicenseRequest, ValidateLicenseResponse } from "@shared/api";
 import { validateLicense } from "../services/license-service";
+import { getLicenseHost } from "../utils/license-host";
 
 export const validateLicenseHandler: RequestHandler = async (req, res) => {
   try {
     const { licenseKey } = req.body as ValidateLicenseRequest;
 
-    // Get the proper host from forwarded headers (production) or direct headers (dev)
-    // X-Forwarded-Host is set by proxies/load balancers in production
-    const forwardedHost = req.headers['x-forwarded-host'] as string || req.headers.host || "localhost";
-    // Extract just the hostname without port for consistent binding
-    const host = forwardedHost.split(':')[0];
+    const host = getLicenseHost(req);
+    if (!host) {
+      return res.status(503).json({
+        valid: false,
+        message: "The licensed server hostname is not configured.",
+        errorCode: "LICENSE_HOST_CONFIG_MISSING",
+      });
+    }
 
     if (!licenseKey || typeof licenseKey !== "string") {
       return res.status(400).json({
@@ -40,11 +44,14 @@ export const validateLicenseHandler: RequestHandler = async (req, res) => {
 
 export const checkLicenseStatusHandler: RequestHandler = async (req, res) => {
   try {
-    // Get the proper host from forwarded headers (production) or direct headers (dev)
-    // X-Forwarded-Host is set by proxies/load balancers in production
-    const forwardedHost = req.headers['x-forwarded-host'] as string || req.headers.host || "localhost";
-    // Extract just the hostname without port for consistent binding
-    const host = forwardedHost.split(':')[0];
+    const host = getLicenseHost(req);
+    if (!host) {
+      return res.status(503).json({
+        valid: false,
+        message: "The licensed server hostname is not configured.",
+        errorCode: "LICENSE_HOST_CONFIG_MISSING",
+      });
+    }
 
     const result = await validateLicense(host);
     const response: ValidateLicenseResponse = {

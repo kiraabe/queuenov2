@@ -67,6 +67,7 @@ import {
 import { cleanupAllStaleSessions } from "./store/sessions";
 import { autoCancelExpiredHolds, DB_CONFIG } from "./store/db";
 import { dbRateLimitMiddleware, strictDbRateLimitMiddleware, extractUserIdMiddleware } from "./middleware/db-rate-limit";
+import { enforceLicense } from "./middleware/license-enforcement";
 import { getRateLimitStatus, resetUserRateLimit, clearAllRateLimits } from "./services/query-rate-limiter";
 import { tellerStats, tellerTickets } from "./routes/teller";
 import {
@@ -216,6 +217,8 @@ export function createServer() {
 
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+  app.use("/api", enforceLicense);
 
   // Extract user ID from authentication context for rate limiting
   app.use(extractUserIdMiddleware);
