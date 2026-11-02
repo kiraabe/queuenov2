@@ -46,6 +46,13 @@ export async function validateLicense(host: string, licenseKey?: string): Promis
     try {
       const dbLicense = await getLicenseByKeyDb(envLicenseKey);
       if (dbLicense && dbLicense.activatedHost === host && dbLicense.status === 'active') {
+        if (dbLicense.expiresAt && Date.now() >= dbLicense.expiresAt) {
+          return {
+            valid: false,
+            message: "License has expired.",
+            errorCode: "LICENSE_EXPIRED",
+          };
+        }
         console.log(`[License] Host ${host} is already activated. Allowing access.`);
         return {
           valid: true,
@@ -90,7 +97,7 @@ export async function validateLicense(host: string, licenseKey?: string): Promis
           errorCode: "LICENSE_INVALID_STATUS",
         };
       }
-      if (dbLicense.expiresAt && Date.now() > dbLicense.expiresAt) {
+      if (dbLicense.expiresAt && Date.now() >= dbLicense.expiresAt) {
         console.log(`[License] Expiration check failed: ${Date.now()} > ${dbLicense.expiresAt}`);
         return {
           valid: false,

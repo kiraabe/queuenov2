@@ -116,7 +116,7 @@ export default function LicenseManagement({ unlockToken }: { unlockToken: string
         body: JSON.stringify({
           licensee: formData.licensee.trim(),
           expiresAt: formData.expiresOn
-            ? new Date(`${formData.expiresOn}T23:59:59`).getTime()
+            ? new Date(`${formData.expiresOn}T23:59:59.999`).getTime()
             : undefined,
           notes: formData.notes.trim(),
         }),
