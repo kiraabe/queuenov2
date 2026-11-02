@@ -375,6 +375,14 @@ export async function initDb() {
     await p.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS phone text;`);
     // Remove position column if it exists and migrate to job_title_id
     await p.query(`ALTER TABLE users DROP COLUMN IF EXISTS position;`);
+    await p.query(`CREATE TABLE IF NOT EXISTS login_rate_limits (
+    bucket_key text primary key,
+    attempts integer not null,
+    window_started_at timestamptz not null,
+    locked_until timestamptz,
+    updated_at timestamptz not null default now()
+  );`);
+    await p.query(`CREATE INDEX IF NOT EXISTS login_rate_limits_updated_at_idx ON login_rate_limits (updated_at);`);
     await p.query(`CREATE TABLE IF NOT EXISTS user_sessions (
     id uuid primary key default gen_random_uuid(),
     user_id uuid not null references users(id) on delete cascade,

@@ -124,8 +124,8 @@ import {
 export function createServer() {
   const app = express();
 
-  // Respect proxy headers for HTTPS detection in production
-  app.set("trust proxy", true);
+  // Trust the single reverse proxy hop in front of the app.
+  app.set("trust proxy", 1);
 
   // Middleware
   const allowedEnv = (process.env.ALLOWED_ORIGINS || "")
@@ -163,8 +163,7 @@ export function createServer() {
       process.env.NODE_ENV === "production" ||
       process.env.FORCE_HTTPS === "true";
     if (isProd) {
-      const proto = (req.headers["x-forwarded-proto"] as string) || "";
-      if (proto && !proto.split(",")[0].includes("https")) {
+      if (!req.secure) {
         const host = req.headers.host || "";
         const url = `https://${host}${req.originalUrl}`;
         return res.redirect(301, url);

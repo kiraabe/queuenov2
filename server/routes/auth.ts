@@ -34,6 +34,12 @@ import {
 } from "../store/sessions";
 import type { SessionRecord, SessionRevokeReason } from "../store/sessions";
 import { broadcastSessionUpdate } from "../services/session-websocket";
+import {
+  clearLoginAccountFailures,
+  getLoginRateLimitKeys,
+  isLoginRateLimited,
+  recordLoginFailure,
+} from "../store/login-rate-limiter";
 
 // For production HTTPS, use SameSite=None with Secure flag
 // For development HTTP, use SameSite=Lax without Secure flag
@@ -248,28 +254,8 @@ async function authenticateRequest(
   return { ok: true, session, token };
 }
 
-// Simple in-memory rate limiting and lockout for login
-const attemptsByKey = new Map<string, { count: number; resetAt: number }>();
-const globalAttemptsByUser = new Map<
-  string,
-  { count: number; resetAt: number }
->();
-const lockedUntilByUser = new Map<string, number>();
-const lockedUntilByIpUser = new Map<string, number>();
-// Helper function to extract and clean IP address
 function getClientIpAddress(req: Request): string {
-  // Try x-forwarded-for first (for proxies like Nginx, CloudFlare)
-  const xForwardedFor = req.headers["x-forwarded-for"];
-  if (xForwardedFor && typeof xForwardedFor === "string") {
-    const ip = xForwardedFor.split(",")[0]?.trim() || "";
-    if (ip) return cleanIpAddress(ip);
-  }
-
-  // Fallback to socket remote address
-  const socketIp = req.socket?.remoteAddress || "";
-  if (socketIp) return cleanIpAddress(socketIp);
-
-  return "";
+  return cleanIpAddress(req.ip || req.socket?.remoteAddress || "");
 }
 
 // Helper function to clean IPv6-mapped IPv4 addresses
@@ -286,9 +272,8 @@ function cleanIpAddress(ip: string): string {
   return ip;
 }
 
-function keyFor(req: Request, username: string) {
-  const ip = getClientIpAddress(req);
-  return `${username.toLowerCase()}|${ip}`;
+function loginRateLimitKeys(req: Request, username: string) {
+  return getLoginRateLimitKeys(getClientIpAddress(req), username);
 }
 
 /**
@@ -387,56 +372,12 @@ function normalizeOsDetection(
 
   return { osName, osVersion };
 }
-function incrementAttempt(
-  req: Request,
-  username: string,
-  windowMs = 10 * 60 * 1000,
-) {
-  const key = keyFor(req, username);
-  const now = Date.now();
-  const entry = attemptsByKey.get(key);
-  if (!entry || entry.resetAt < now) {
-    attemptsByKey.set(key, { count: 1, resetAt: now + windowMs });
-    return 1;
-  }
-  entry.count += 1;
-  attemptsByKey.set(key, entry);
-  return entry.count;
+async function isLocked(req: Request, username: string) {
+  return isLoginRateLimited(loginRateLimitKeys(req, username));
 }
-function incrementGlobalAttempt(username: string, windowMs = 10 * 60 * 1000) {
-  const key = username.toLowerCase();
-  const now = Date.now();
-  const entry = globalAttemptsByUser.get(key);
-  if (!entry || entry.resetAt < now) {
-    globalAttemptsByUser.set(key, { count: 1, resetAt: now + windowMs });
-    return 1;
-  }
-  entry.count += 1;
-  globalAttemptsByUser.set(key, entry);
-  return entry.count;
-}
-function isLocked(req: Request, username: string) {
-  const ipKey = keyFor(req, username);
-  const userKey = username.toLowerCase();
-  const now = Date.now();
 
-  const userUntil = lockedUntilByUser.get(userKey) || 0;
-  if (now < userUntil) return true;
-
-  const ipUntil = lockedUntilByIpUser.get(ipKey) || 0;
-  if (now < ipUntil) return true;
-
-  return false;
-}
-function lockUserByIp(req: Request, username: string, minutes = 15) {
-  const ipKey = keyFor(req, username);
-  const until = Date.now() + minutes * 60 * 1000;
-  lockedUntilByIpUser.set(ipKey, until);
-}
-function lockUserGlobally(username: string, minutes = 15) {
-  const userKey = username.toLowerCase();
-  const until = Date.now() + minutes * 60 * 1000;
-  lockedUntilByUser.set(userKey, until);
+async function recordFailedLogin(req: Request, username: string) {
+  return recordLoginFailure(loginRateLimitKeys(req, username));
 }
 
 export const login: RequestHandler = async (req, res) => {
@@ -468,7 +409,7 @@ export const login: RequestHandler = async (req, res) => {
   if (isWindowInput) {
     isWindowLogin = true;
     loginKey = `window_${windowId}`;
-    if (isLocked(req, loginKey)) {
+    if (await isLocked(req, loginKey)) {
       return res.status(429).json({
         error: "Too many attempts. Try again later.",
         message: "Too many attempts. Try again later.",
@@ -478,7 +419,7 @@ export const login: RequestHandler = async (req, res) => {
     userRow = await getUserByWindow(windowId);
   } else {
     loginKey = `user_${input}`;
-    if (isLocked(req, loginKey)) {
+    if (await isLocked(req, loginKey)) {
       return res.status(429).json({
         error: "Too many attempts. Try again later.",
         message: "Too many attempts. Try again later.",
@@ -489,10 +430,7 @@ export const login: RequestHandler = async (req, res) => {
   }
 
   if (!userRow) {
-    const c = incrementAttempt(req, loginKey);
-    if (c >= 10) lockUserByIp(req, loginKey, 15);
-    const gc = incrementGlobalAttempt(loginKey);
-    if (gc >= 50) lockUserGlobally(loginKey, 15);
+    await recordFailedLogin(req, loginKey);
     return res.status(401).json({
       error: "Invalid username or password",
       message: "Invalid username or password.",
@@ -510,10 +448,7 @@ export const login: RequestHandler = async (req, res) => {
 
   const passwordMatch = verifyPassword(password, userRow.password_hash);
   if (!passwordMatch) {
-    const c = incrementAttempt(req, loginKey);
-    if (c >= 10) lockUserByIp(req, loginKey, 15);
-    const gc = incrementGlobalAttempt(loginKey);
-    if (gc >= 50) lockUserGlobally(loginKey, 15);
+    await recordFailedLogin(req, loginKey);
     return res.status(401).json({
       error: "Invalid username or password",
       message: "Invalid username or password.",
@@ -528,10 +463,7 @@ export const login: RequestHandler = async (req, res) => {
   const isSmallScreen = screenWidth < 1024;
 
   if (isSmallScreen && userRow.role !== "admin") {
-    const c = incrementAttempt(req, loginKey);
-    if (c >= 10) lockUserByIp(req, loginKey, 15);
-    const gc = incrementGlobalAttempt(loginKey);
-    if (gc >= 50) lockUserGlobally(loginKey, 15);
+    await recordFailedLogin(req, loginKey);
     return res.status(403).json({
       error: "Admin access only on small screens",
       message: "Only admin users can log in on screens smaller than 1024px. Please use a larger screen or contact your administrator.",
@@ -856,6 +788,7 @@ export const login: RequestHandler = async (req, res) => {
   }
 
   const { token, session } = sessionResult;
+  await clearLoginAccountFailures(loginRateLimitKeys(req, loginKey));
 
   res.setHeader("Set-Cookie", buildSessionCookie(token));
 
