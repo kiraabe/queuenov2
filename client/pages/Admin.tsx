@@ -10,6 +10,9 @@ import {
   Settings,
   User,
   Briefcase,
+  FileText,
+  LineChart,
+  Workflow,
 } from "lucide-react";
 import MobileAdminLayout from "@/components/admin/MobileAdminLayout";
 import AdminDashboard from "@/components/admin/AdminDashboard";
@@ -19,11 +22,17 @@ import AdminSettings from "@/components/admin/AdminSettings";
 import AdminProfile from "@/components/admin/AdminProfile";
 import EmploymentManagement from "@/components/admin/EmploymentManagement";
 import AdminWindows from "@/components/admin/AdminWindows";
+import DailyReportViewer from "@/components/admin/DailyReportViewer";
+import AdminAdvancedAnalytics from "@/components/admin/AdminAdvancedAnalytics";
+import CaseWorkflowTracker from "@/components/admin/CaseWorkflowTracker";
 import AdminFooter from "@/components/admin/AdminFooter";
 import { ProfileDropdown } from "@/components/admin/ProfileDropdown";
 
 export type AdminSection =
   | "dashboard"
+  | "reports"
+  | "analytics"
+  | "process-flow"
   | "employment"
   | "sessions"
   | "tickets"
@@ -54,6 +63,24 @@ export default function Admin({ section }: AdminProps) {
       label: "Dashboard",
       icon: <BarChart3 className="h-5 w-5" />,
       path: "/admin/dashboard",
+    },
+    {
+      id: "reports",
+      label: "Reports",
+      icon: <FileText className="h-5 w-5" />,
+      path: "/admin/reports",
+    },
+    {
+      id: "analytics",
+      label: "Advanced Analytics",
+      icon: <LineChart className="h-5 w-5" />,
+      path: "/admin/analytics",
+    },
+    {
+      id: "process-flow",
+      label: "Process Flow",
+      icon: <Workflow className="h-5 w-5" />,
+      path: "/admin/process-flow",
     },
     {
       id: "employment",
@@ -101,6 +128,12 @@ export default function Admin({ section }: AdminProps) {
     switch (section) {
       case "dashboard":
         return <AdminDashboard />;
+      case "reports":
+        return <DailyReportViewer />;
+      case "analytics":
+        return <AdminAdvancedAnalytics />;
+      case "process-flow":
+        return <CaseWorkflowTracker />;
       case "employment":
         return <EmploymentManagement />;
       case "sessions":

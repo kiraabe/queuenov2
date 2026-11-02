@@ -147,6 +147,9 @@ const App = () => (
                 <Route element={<RequireAuth role="admin" />}>
                   <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
                   <Route path="/admin/dashboard" element={<Admin section="dashboard" />} />
+                  <Route path="/admin/reports" element={<Admin section="reports" />} />
+                  <Route path="/admin/analytics" element={<Admin section="analytics" />} />
+                  <Route path="/admin/process-flow" element={<Admin section="process-flow" />} />
                   <Route path="/admin/employment" element={<Admin section="employment" />} />
                   <Route path="/admin/sessions" element={<Admin section="sessions" />} />
                   <Route path="/admin/tickets" element={<Admin section="tickets" />} />

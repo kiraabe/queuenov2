@@ -10,7 +10,6 @@ import {
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Tooltip,
   TooltipContent,
@@ -35,13 +34,6 @@ import type {
   Ticket,
   DisplayState,
 } from "@shared/api";
-import DailyReportViewer from "./DailyReportViewer";
-import EmployeePerformanceDashboard from "./EmployeePerformanceDashboard";
-import CaseWorkflowTracker from "./CaseWorkflowTracker";
-import EmployeeCaseQueue from "./EmployeeCaseQueue";
-import ServiceCategoryAnalytics from "./ServiceCategoryAnalytics";
-import OverallEmployeeAnalytics from "./OverallEmployeeAnalytics";
-import OverallCategoryAnalytics from "./OverallCategoryAnalytics";
 import MetricTile from "./dashboard/MetricTile";
 import CurrentDisplayCard from "./dashboard/CurrentDisplayCard";
 
@@ -101,9 +93,6 @@ export default function AdminDashboard() {
   const [tickets, setTickets] = useState<Record<string, Ticket>>({});
   const [display, setDisplay] = useState<DisplayState | null>(null);
   const [lastUpdate, setLastUpdate] = useState<number>(Date.now());
-  const [analyticsView, setAnalyticsView] = useState<"overall" | "daily">(
-    "overall",
-  );
   const [employeeStats, setEmployeeStats] = useState<EmployeeStats>({
     totalEmployees: 0,
     totalCases: 0,
@@ -510,52 +499,6 @@ export default function AdminDashboard() {
       </Card>
 
       {display && <CurrentDisplayCard display={display} tickets={tickets} />}
-
-      <DailyReportViewer />
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Advanced Analytics</CardTitle>
-          <CardDescription>
-            Comprehensive metrics for performance tracking and analysis
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <Button
-              variant={analyticsView === "overall" ? "default" : "outline"}
-              onClick={() => setAnalyticsView("overall")}
-              className="sm:flex-initial"
-            >
-              Overall Metrics (All-Time)
-            </Button>
-            <Button
-              variant={analyticsView === "daily" ? "default" : "outline"}
-              onClick={() => setAnalyticsView("daily")}
-              className="sm:flex-initial"
-            >
-              Daily Metrics
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {analyticsView === "overall" && (
-        <div className="space-y-6">
-          <OverallEmployeeAnalytics />
-          <OverallCategoryAnalytics />
-          <CaseWorkflowTracker defaultTimeframe="all-time" />
-        </div>
-      )}
-
-      {analyticsView === "daily" && (
-        <div className="space-y-6">
-          <EmployeePerformanceDashboard />
-          <ServiceCategoryAnalytics />
-          <EmployeeCaseQueue />
-          <CaseWorkflowTracker />
-        </div>
-      )}
     </div>
   );
 }
