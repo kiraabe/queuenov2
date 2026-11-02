@@ -8,6 +8,7 @@ import type {
 } from "../../shared/api";
 import { formatTicketCode } from "../../shared/api";
 import { calculateActiveDurationSeconds } from "../../shared/time";
+import { SUPABASE_ROOT_CA_PEM } from "./supabase-root-ca";
 
 export const isDbEnabled = true; // DB-only mode - no in-memory fallback
 
@@ -60,7 +61,8 @@ export function getPool() {
       }
     }
 
-    const databaseCa = process.env.DATABASE_SSL_CA?.replace(/\\n/g, "\n");
+    const envCa = process.env.DATABASE_SSL_CA?.replace(/\\n/g, "\n");
+    const databaseCa = envCa?.includes("-----END CERTIFICATE-----") ? envCa : SUPABASE_ROOT_CA_PEM;
     pool = new Pool({
       connectionString: cleaned,
       ssl: { rejectUnauthorized: true, ...(databaseCa ? { ca: databaseCa } : {}) },
