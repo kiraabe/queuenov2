@@ -157,7 +157,11 @@ function PasswordInput({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function ChangePasswordForm() {
+export function ChangePasswordForm({
+  onPasswordChanged,
+}: {
+  onPasswordChanged?: () => Promise<void> | void;
+} = {}) {
   const { t } = useTranslation();
   const [isLoading, setIsLoading]                   = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
@@ -242,6 +246,7 @@ export function ChangePasswordForm() {
         method: "POST",
         body: JSON.stringify({ currentPassword, newPassword, confirmPassword }),
       });
+      await onPasswordChanged?.();
 
       setSuccess(true);
       setCurrentPassword("");

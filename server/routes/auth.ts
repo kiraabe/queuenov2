@@ -77,6 +77,7 @@ function toAuthUserFromRow(row: {
   email?: string | null;
   department?: string | null;
   created_at?: Date | string | null;
+  must_change_password?: boolean;
 }): AuthUser {
   return {
     id: row.id,
@@ -90,6 +91,7 @@ function toAuthUserFromRow(row: {
     email: row.email ?? undefined,
     department: row.department ?? undefined,
     createdAt: row.created_at ? new Date(row.created_at).getTime() : null,
+    mustChangePassword: row.must_change_password ?? false,
   };
 }
 
@@ -100,6 +102,7 @@ function toAuthUserFromSession(session: SessionRecord): AuthUser {
     role: session.activeRole,
     windowId: session.windowId ?? null,
     jobTitleId: session.jobTitleId ?? undefined,
+    mustChangePassword: session.mustChangePassword,
   };
 }
 
@@ -843,7 +846,7 @@ export const me: RequestHandler = async (req, res) => {
   // Fetch full user data from database to include email, phone, department, etc.
   const p = getPool();
   const { rows } = await p.query(
-    `SELECT u.id, u.username, u.password_hash, u.window_id, u.disabled, u.full_name, u.job_title_id, u.phone, u.email, u.department, u.created_at
+    `SELECT u.id, u.username, u.password_hash, u.window_id, u.disabled, u.full_name, u.job_title_id, u.phone, u.email, u.department, u.created_at, u.must_change_password
      FROM users u
      WHERE u.id=$1 LIMIT 1`,
     [session.userId],
@@ -1386,7 +1389,7 @@ export const changePassword: RequestHandler = async (req, res) => {
 
     await pool.query(
       `WITH updated_user AS (
-         UPDATE users SET password_hash = $1 WHERE id = $2 RETURNING id
+         UPDATE users SET password_hash = $1, must_change_password = false WHERE id = $2 RETURNING id
        )
        UPDATE user_sessions
        SET revoked_at = now(), revoke_reason = 'invalidated'

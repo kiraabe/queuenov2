@@ -266,6 +266,7 @@ export interface SessionRecord {
   countryCode: string | null;
   city: string | null;
   region: string | null;
+  mustChangePassword: boolean;
   revokedAt: Date | null;
   revokeReason: SessionRevokeReason | null;
 }
@@ -301,6 +302,7 @@ function mapRow(row: any): SessionRecord {
     countryCode: row.country_code ?? null,
     city: row.city ?? null,
     region: row.region ?? null,
+    mustChangePassword: row.must_change_password ?? false,
     revokedAt: row.revoked_at ? new Date(row.revoked_at) : null,
     revokeReason: (row.revoke_reason as SessionRevokeReason | null) ?? null,
   };
@@ -594,9 +596,10 @@ export async function findSessionByToken(token: string) {
   const hash = hashToken(token);
   const p = getPool();
   const { rows } = await p.query(
-    `SELECT id, user_id, username, active_role, window_id, job_title_id, token_hash, device, browser, os, ip_address, os_name, os_version, device_vendor, device_model, browser_name, browser_version, created_at, last_activity_at, expires_at, revoked_at, revoke_reason
-     FROM user_sessions
-     WHERE token_hash = $1
+    `SELECT s.id, s.user_id, s.username, s.active_role, s.window_id, s.job_title_id, s.token_hash, s.device, s.browser, s.os, s.ip_address, s.os_name, s.os_version, s.device_vendor, s.device_model, s.browser_name, s.browser_version, s.created_at, s.last_activity_at, s.expires_at, s.revoked_at, s.revoke_reason, u.must_change_password
+     FROM user_sessions s
+     JOIN users u ON u.id = s.user_id
+     WHERE s.token_hash = $1
      LIMIT 1`,
     [hash],
   );

@@ -13,6 +13,7 @@ interface AuthContextValue {
   ) => Promise<AuthUser>;
   logout: () => Promise<void>;
   switchRole: (role: string) => Promise<AuthUser>;
+  refreshUser: () => Promise<AuthUser | null>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -204,6 +205,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
         setUser(res.user);
         return res.user;
+      },
+      async refreshUser() {
+        const response = await apiFetch<MeResponse>("/api/auth/me");
+        const refreshedUser = response.user || null;
+        setUser(refreshedUser);
+        return refreshedUser;
       },
     }),
     [user],

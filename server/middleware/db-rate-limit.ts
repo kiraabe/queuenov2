@@ -9,6 +9,20 @@ import {
 import { findSessionByToken, SESSION_COOKIE, SESSION_IDLE_TIMEOUT_SECONDS } from "../store/sessions";
 import { parseCookies } from "../utils/auth";
 
+const PASSWORD_CHANGE_ALLOWED_PATHS = new Set([
+  "/api/license/status",
+  "/api/license/validate",
+  "/api/auth/me",
+  "/api/auth/login",
+  "/api/auth/logout",
+  "/api/auth/heartbeat",
+  "/api/auth/tab-opened",
+  "/api/auth/tab-closed",
+  "/api/auth/change-password",
+  "/api/session/ping",
+  "/api/session/logout",
+]);
+
 /**
  * Express middleware for database rate limiting
  * Checks query and connection limits for authenticated users
@@ -114,10 +128,12 @@ export function strictDbRateLimitMiddleware(
  */
 export async function extractUserIdMiddleware(
   req: Request,
-  _res: Response,
+  res: Response,
   next: NextFunction,
 ) {
   try {
+    if (!req.path.startsWith("/api/")) return next();
+    const passwordChangeAllowed = PASSWORD_CHANGE_ALLOWED_PATHS.has(req.path);
     const userId =
       (req as any).session?.userId ||
       (req as any).user?.id ||
@@ -139,6 +155,13 @@ export async function extractUserIdMiddleware(
       now <= session.expiresAt.getTime() &&
       now - session.lastActivityAt.getTime() <= SESSION_IDLE_TIMEOUT_SECONDS * 1000
     ) {
+      if (session.mustChangePassword && !passwordChangeAllowed) {
+        return res.status(403).json({
+          error: "Password change required",
+          message: "Change your temporary password before using the application.",
+          code: "PASSWORD_CHANGE_REQUIRED",
+        });
+      }
       (req as any).userId = session.userId;
     }
 

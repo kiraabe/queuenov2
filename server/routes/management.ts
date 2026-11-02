@@ -859,6 +859,7 @@ export const assignTellerToWindow: RequestHandler = async (req, res) => {
 };
 
 export const resetWindowPassword: RequestHandler = async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
   if (!isDbEnabled) {
     return res.status(400).json({ error: "DB not enabled" });
   }
@@ -908,7 +909,7 @@ export const resetWindowPassword: RequestHandler = async (req, res) => {
     const userId = userRes.rows[0].id;
 
     // Update existing window user password
-    await p.query(`UPDATE users SET password_hash = $1 WHERE id = $2`, [
+    await p.query(`UPDATE users SET password_hash = $1, must_change_password = true WHERE id = $2`, [
       passwordHash,
       userId,
     ]);
@@ -935,6 +936,7 @@ export const resetWindowPassword: RequestHandler = async (req, res) => {
 };
 
 export const resetUserPassword: RequestHandler = async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
   if (!isDbEnabled) {
     return res.status(400).json({ error: "DB not enabled" });
   }
@@ -969,7 +971,7 @@ export const resetUserPassword: RequestHandler = async (req, res) => {
     const passwordHash = hashPassword(newPassword);
 
     // Update user password
-    await p.query(`UPDATE users SET password_hash = $1 WHERE id = $2`, [
+    await p.query(`UPDATE users SET password_hash = $1, must_change_password = true WHERE id = $2`, [
       passwordHash,
       userId,
     ]);

@@ -70,6 +70,11 @@ export default function Login() {
     try {
       const user = await login(u, p, viewportWidth);
 
+      if (user.mustChangePassword) {
+        navigate("/change-password", { replace: true });
+        return;
+      }
+
       if (user.roles && user.roles.length > 1) {
         navigate("/role-selector");
         return;

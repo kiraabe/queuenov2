@@ -258,6 +258,7 @@ export interface AuthUser {
   position?: string; // job position (for future use)
   createdAt?: number | null; // account creation time (ms epoch)
   lastLoginAt?: number | null; // time of the current login (ms epoch)
+  mustChangePassword?: boolean;
 }
 export interface LoginRequest {
   username: string;

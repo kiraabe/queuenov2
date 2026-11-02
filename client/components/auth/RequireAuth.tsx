@@ -17,6 +17,9 @@ export function RequireAuth({
         replace
       />
     );
+  if (user.mustChangePassword && loc.pathname !== "/change-password") {
+    return <Navigate to="/change-password" replace />;
+  }
   if (role && user.role !== role)
     return <Navigate to={homePathForUser(user) ?? "/"} replace />;
   return <Outlet />;

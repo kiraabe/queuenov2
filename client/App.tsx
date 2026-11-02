@@ -4,7 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "next-themes";
 import AppLayout from "@/components/layout/AppLayout";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 import { lazy, Suspense, useEffect, useRef } from "react";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
@@ -15,6 +15,7 @@ import Display from "./pages/Display";
 import TicketStatus from "./pages/TicketStatus";
 import Track from "./pages/Track";
 import Login from "./pages/Login";
+import ChangePassword from "./pages/ChangePassword";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import RoleSelector from "./pages/RoleSelector";
@@ -59,6 +60,7 @@ function TellerHomeRedirect() {
 function SessionMonitor() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const previousUserRef = useRef<any>(undefined);
 
   useEffect(() => {
@@ -72,8 +74,9 @@ function SessionMonitor() {
       console.log("[SessionMonitor] User logged out or session ended");
     }
 
-    // Redirect if session was lost
-    if (wasLoggedIn && isNowLoggedOut && hasLoadedAuthState) {
+    if (user?.mustChangePassword && location.pathname !== "/change-password") {
+      navigate("/change-password", { replace: true });
+    } else if (wasLoggedIn && isNowLoggedOut && hasLoadedAuthState) {
       console.warn("[SessionMonitor] Redirecting to login due to session loss");
       navigate("/login", { replace: true });
     }
@@ -82,7 +85,7 @@ function SessionMonitor() {
     if (user !== undefined) {
       previousUserRef.current = user;
     }
-  }, [user, navigate]);
+  }, [user, navigate, location.pathname]);
 
   return null;
 }
@@ -114,6 +117,9 @@ const App = () => (
 
                 {/* Semi-public routes - available to all authenticated users */}
                 <Route path="/profile" element={<Profile />} />
+                <Route element={<RequireAuth />}>
+                  <Route path="/change-password" element={<ChangePassword />} />
+                </Route>
                 <Route path="/role-selector" element={<RoleSelector />} />
                 <Route path="/tickets/:code" element={<TicketStatus />} />
 

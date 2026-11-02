@@ -12,6 +12,7 @@ interface BulkUserImport {
 }
 
 export const bulkImportUsers: RequestHandler = async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
   try {
     const users = req.body as BulkUserImport[];
 
@@ -59,8 +60,8 @@ export const bulkImportUsers: RequestHandler = async (req, res) => {
 
         // Insert user
         await pool.query(
-          `INSERT INTO users (id, username, password_hash, window_id, department) 
-           VALUES ($1, $2, $3, $4, $5)`,
+          `INSERT INTO users (id, username, password_hash, window_id, department, must_change_password)
+           VALUES ($1, $2, $3, $4, $5, true)`,
           [userId, username, passwordHash, user.window_id ?? null, user.department ?? null],
         );
 

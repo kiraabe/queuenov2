@@ -271,6 +271,9 @@ export async function initDb() {
     await p.query(
       `ALTER TABLE users ADD COLUMN IF NOT EXISTS disabled boolean DEFAULT false;`,
     );
+    await p.query(
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password boolean NOT NULL DEFAULT false;`,
+    );
 
     // Create user_roles junction table to support multiple roles per user
     await p.query(`CREATE TABLE IF NOT EXISTS user_roles (
@@ -3161,12 +3164,12 @@ export async function getUserByUsername(username: string): Promise<{
   phone?: string | null;
   email?: string | null;
   department?: string | null;
-  position?: string | null;
+  must_change_password: boolean;
 } | null> {
   try {
     const p = getPool();
     const { rows } = await p.query(
-      `SELECT u.id, u.username, u.password_hash, u.window_id, u.disabled, u.full_name, u.job_title_id, u.phone, u.email, u.department
+      `SELECT u.id, u.username, u.password_hash, u.window_id, u.disabled, u.full_name, u.job_title_id, u.phone, u.email, u.department, u.must_change_password
        FROM users u
        WHERE u.username=$1 LIMIT 1`,
       [username],
@@ -3198,6 +3201,7 @@ export async function getUserByUsername(username: string): Promise<{
       phone: user.phone,
       email: user.email,
       department: user.department,
+      must_change_password: user.must_change_password,
     };
   } catch (error) {
     throw error;
@@ -3217,12 +3221,12 @@ export async function getUserByWindow(windowId: number): Promise<{
   phone?: string | null;
   email?: string | null;
   department?: string | null;
-  position?: string | null;
+  must_change_password: boolean;
 } | null> {
   try {
     const p = getPool();
     const { rows } = await p.query(
-      `SELECT u.id, u.username, u.password_hash, u.window_id, u.disabled, u.full_name, u.job_title_id, u.phone, u.email, u.department
+      `SELECT u.id, u.username, u.password_hash, u.window_id, u.disabled, u.full_name, u.job_title_id, u.phone, u.email, u.department, u.must_change_password
        FROM users u
        WHERE u.window_id=$1 LIMIT 1`,
       [windowId],
@@ -3254,6 +3258,7 @@ export async function getUserByWindow(windowId: number): Promise<{
       phone: user.phone,
       email: user.email,
       department: user.department,
+      must_change_password: user.must_change_password,
     };
   } catch (error) {
     throw error;
