@@ -215,15 +215,15 @@ export default function Admin({ section }: AdminProps) {
                   onValueChange={(value) => navigate(`/admin/${value}`)}
                   className="w-full"
                 >
-                  <TabsList className="flex h-9 w-full justify-start gap-1 overflow-x-auto bg-muted/50">
+                  <TabsList className="grid w-full grid-cols-3">
                     {reportSubItems.map((item) => (
                       <TabsTrigger
                         key={item.id}
                         value={item.id}
-                        className="group flex items-center gap-2 px-3 h-7"
+                        className="flex items-center gap-2"
                       >
                         <span className="h-4 w-4 shrink-0">{item.icon}</span>
-                        <span className="font-medium">{item.label}</span>
+                        <span className="hidden sm:inline">{item.label}</span>
                       </TabsTrigger>
                     ))}
                   </TabsList>
