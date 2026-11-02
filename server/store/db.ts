@@ -62,7 +62,13 @@ export function getPool() {
     }
 
     const envCa = process.env.DATABASE_SSL_CA?.replace(/\\n/g, "\n");
-    const databaseCa = envCa?.includes("-----END CERTIFICATE-----") ? envCa : SUPABASE_ROOT_CA_PEM;
+    const dbHostname = cleaned ? new URL(cleaned).hostname : "";
+    const isSupabaseHost = /\.supabase\.(co|com)$/.test(dbHostname);
+    const databaseCa = envCa?.includes("-----END CERTIFICATE-----")
+      ? envCa
+      : isSupabaseHost
+        ? SUPABASE_ROOT_CA_PEM
+        : undefined;
     pool = new Pool({
       connectionString: cleaned,
       ssl: { rejectUnauthorized: true, ...(databaseCa ? { ca: databaseCa } : {}) },
