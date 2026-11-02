@@ -157,11 +157,31 @@ export default function Admin({ section }: AdminProps) {
     }
   };
 
+  const reportsSubTabs = isReportsGroup ? (
+    <Tabs
+      value={section}
+      onValueChange={(value) => navigate(`/admin/${value}`)}
+      className="w-full"
+    >
+      <TabsList className="grid w-full grid-cols-3">
+        {reportSubItems.map((item) => (
+          <TabsTrigger key={item.id} value={item.id} className="flex items-center gap-2">
+            <span className="h-4 w-4 shrink-0">{item.icon}</span>
+            <span className="hidden sm:inline">{item.label}</span>
+          </TabsTrigger>
+        ))}
+      </TabsList>
+    </Tabs>
+  ) : null;
+
   if (!isDesktop) {
     return (
       <TooltipProvider>
-        <MobileAdminLayout navItems={navItems} activeTab={section}>
-          {renderContent()}
+        <MobileAdminLayout navItems={navItems} activeTab={isReportsGroup ? "reports" : section}>
+          <div className="space-y-4">
+            {reportsSubTabs}
+            {renderContent()}
+          </div>
         </MobileAdminLayout>
       </TooltipProvider>
     );
@@ -209,26 +229,7 @@ export default function Admin({ section }: AdminProps) {
                 </TabsList>
               </Tabs>
 
-              {isReportsGroup && (
-                <Tabs
-                  value={section}
-                  onValueChange={(value) => navigate(`/admin/${value}`)}
-                  className="w-full"
-                >
-                  <TabsList className="grid w-full grid-cols-3">
-                    {reportSubItems.map((item) => (
-                      <TabsTrigger
-                        key={item.id}
-                        value={item.id}
-                        className="flex items-center gap-2"
-                      >
-                        <span className="h-4 w-4 shrink-0">{item.icon}</span>
-                        <span className="hidden sm:inline">{item.label}</span>
-                      </TabsTrigger>
-                    ))}
-                  </TabsList>
-                </Tabs>
-              )}
+              {reportsSubTabs}
             </div>
 
             <div className="mt-8 space-y-4">{renderContent()}</div>

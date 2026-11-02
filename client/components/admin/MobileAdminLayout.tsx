@@ -23,7 +23,10 @@ export default function MobileAdminLayout({
 }: MobileAdminLayoutProps) {
   const navigate = useNavigate();
   // Filter nav items for mobile bottom nav
-  const mobileNavItems = navItems.slice(0, 5); // Dashboard, Employment, Sessions, Tickets, Windows
+  const mobileNavItems = navItems.filter(
+    (item) =>
+      !["settings", "profile", "analytics", "process-flow"].includes(item.id),
+  );
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background">
