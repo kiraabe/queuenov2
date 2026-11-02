@@ -1,6 +1,7 @@
+import { isIP } from "node:net";
+
 /**
  * Geolocation utility for IP address lookup
- * Uses ip-api.com free tier API for country, city, and region data
  */
 
 export interface GeoLocation {
@@ -16,13 +17,21 @@ const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 /**
  * Look up geolocation data for an IP address
- * Returns cached data if available, otherwise fetches from ip-api.com
+ * Returns cached data if available, otherwise fetches from IPinfo Core
  */
 export async function getGeolocation(ipAddress: string): Promise<GeoLocation> {
-  // Skip lookup for localhost or invalid IPs
-  if (!ipAddress || ipAddress === "127.0.0.1" || ipAddress === "::1" || ipAddress.includes("::ffff:127")) {
+  if (
+    !ipAddress ||
+    isIP(ipAddress) === 0 ||
+    ipAddress === "127.0.0.1" ||
+    ipAddress === "::1" ||
+    ipAddress.startsWith("::ffff:127.")
+  ) {
     return { country: null, countryCode: null, city: null, region: null };
   }
+
+  const token = process.env.IPINFO_TOKEN?.trim();
+  if (!token) return { country: null, countryCode: null, city: null, region: null };
 
   // Check cache
   const cached = geoCache.get(ipAddress);
@@ -31,27 +40,29 @@ export async function getGeolocation(ipAddress: string): Promise<GeoLocation> {
   }
 
   try {
-    // Fetch from ip-api.com (free tier: 45 requests/minute, no API key needed)
-    const response = await fetch(`http://ip-api.com/json/${ipAddress}?fields=country,countryCode,city,region,status`, {
-      signal: AbortSignal.timeout(3000), // 3 second timeout
-    });
+    const response = await fetch(
+      `https://api.ipinfo.io/lookup/${encodeURIComponent(ipAddress)}?token=${encodeURIComponent(token)}`,
+      { signal: AbortSignal.timeout(3000) },
+    );
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
 
-    const data = await response.json();
-
-    // ip-api.com returns status: "success" or "fail"
-    if (data.status !== "success") {
-      return { country: null, countryCode: null, city: null, region: null };
-    }
+    const data = (await response.json()) as {
+      geo?: {
+        country?: string;
+        country_code?: string;
+        city?: string;
+        region?: string;
+      };
+    };
 
     const geoData: GeoLocation = {
-      country: data.country || null,
-      countryCode: data.countryCode || null,
-      city: data.city || null,
-      region: data.region || null,
+      country: data.geo?.country || null,
+      countryCode: data.geo?.country_code || null,
+      city: data.geo?.city || null,
+      region: data.geo?.region || null,
     };
 
     // Cache the result
@@ -59,7 +70,10 @@ export async function getGeolocation(ipAddress: string): Promise<GeoLocation> {
 
     return geoData;
   } catch (error) {
-    console.warn(`Geolocation lookup failed for IP ${ipAddress}:`, error instanceof Error ? error.message : String(error));
+    console.warn(
+      "Geolocation lookup failed:",
+      error instanceof Error ? error.name : "Unknown error",
+    );
     // Return null values on failure, don't throw
     return { country: null, countryCode: null, city: null, region: null };
   }

@@ -27,6 +27,9 @@ const Privacy = () => {
               <li>Service interests and category selections</li>
               <li>Ticket status and history</li>
             </ul>
+            <p>
+              For staff sign-ins, we use the request IP address to estimate the staff member’s country, city, and region for session records. When configured, the server sends valid IP addresses to IPinfo Core over HTTPS for this lookup. IPinfo processes the address under its <a href="https://ipinfo.io/privacy-policy" target="_blank" rel="noreferrer" className="underline">Privacy Policy</a>. Location results are approximate.
+            </p>
           </section>
 
           <section className="space-y-3">
