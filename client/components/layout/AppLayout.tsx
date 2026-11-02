@@ -8,9 +8,10 @@ const AppLayout = () => {
   const { pathname } = useLocation();
   const isAdminPage = pathname.startsWith("/admin");
   const isProfilePage = pathname === "/profile";
+  const isTellerPage = pathname.startsWith("/teller");
   const isConsolePage =
     pathname === "/reception" ||
-    pathname.startsWith("/teller") ||
+    isTellerPage ||
     pathname.startsWith("/archiever") ||
     pathname.startsWith("/employee");
   const isTrackPage = pathname === "/track";
@@ -21,7 +22,7 @@ const AppLayout = () => {
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
       {isConsolePage ? (
-        <ConsoleHeader />
+        !isTellerPage && <ConsoleHeader />
       ) : (
         !hideNavigation && <SiteHeader />
       )}
