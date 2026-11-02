@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { RequestHandler } from "express";
 import { ValidateLicenseResponse } from "@shared/api";
 import {
@@ -7,6 +8,80 @@ import {
   deleteLicenseDb,
   LicenseRecord,
 } from "../store/db";
+
+const LICENSE_UNLOCK_TTL_MS = 15 * 60 * 1000;
+const LICENSE_UNLOCK_HEADER = "x-licenses-unlock";
+
+function unlockSigningSecret(): string {
+  const secret = process.env.APP_SECRET || process.env.AUTH_SECRET;
+  if (!secret) throw new Error("APP_SECRET or AUTH_SECRET must be configured");
+  return secret;
+}
+
+function signLicenseUnlock(userId: string, expiresAt: number): string {
+  const payload = `${userId}.${expiresAt}`;
+  const signature = crypto
+    .createHmac("sha256", unlockSigningSecret())
+    .update(payload)
+    .digest("hex");
+  return `${payload}.${signature}`;
+}
+
+function isValidLicenseUnlock(token: string, userId: string): boolean {
+  const parts = token.split(".");
+  if (parts.length !== 3) return false;
+  const [tokenUserId, expiresAtRaw, signature] = parts;
+  const expiresAt = Number(expiresAtRaw);
+  if (tokenUserId !== userId || !Number.isFinite(expiresAt)) return false;
+  if (expiresAt < Date.now()) return false;
+
+  const expected = signLicenseUnlock(userId, expiresAt).split(".")[2];
+  const a = Buffer.from(signature);
+  const b = Buffer.from(expected);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+export const verifyLicensesPinHandler: RequestHandler = (req, res) => {
+  const configuredPin = process.env.LICENSES_PIN;
+  if (!configuredPin) {
+    return res.status(503).json({
+      success: false,
+      message: "Licenses PIN is not configured on the server",
+    });
+  }
+
+  const submittedPin = typeof req.body?.pin === "string" ? req.body.pin : "";
+  const pinHash = crypto.createHash("sha256").update(submittedPin).digest();
+  const expectedHash = crypto.createHash("sha256").update(configuredPin).digest();
+
+  if (!crypto.timingSafeEqual(pinHash, expectedHash)) {
+    return res.status(401).json({
+      success: false,
+      message: "Incorrect PIN. Please try again.",
+    });
+  }
+
+  const userId = (req as any).auth?.id as string;
+  const expiresAt = Date.now() + LICENSE_UNLOCK_TTL_MS;
+  res.json({
+    success: true,
+    token: signLicenseUnlock(userId, expiresAt),
+    expiresAt,
+  });
+};
+
+export const requireLicensesUnlock: RequestHandler = (req, res, next) => {
+  const token = req.get(LICENSE_UNLOCK_HEADER);
+  const userId = (req as any).auth?.id as string | undefined;
+
+  if (!token || !userId || !isValidLicenseUnlock(token, userId)) {
+    return res.status(403).json({
+      success: false,
+      message: "Licenses are locked. Enter the PIN to continue.",
+    });
+  }
+  next();
+};
 
 interface CreateLicenseRequest {
   licenseKey: string;

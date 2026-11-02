@@ -20,15 +20,12 @@ import type {
   UpdateQueueSettingsResponse,
 } from "@shared/api";
 
-const _v = (a: number, b: number) => a - b;
-const _c_ = [102, 98, 106, 111].map((x, i) => String.fromCharCode(_v(x, [47, 47, 54, 54][i]))).join("");
-
 export default function AdminSettings() {
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [unsavedChanges, setUnsavedChanges] = useState(false);
   const [activeTab, setActiveTab] = useState("queue");
-  const [isLicensesUnlocked, setIsLicensesUnlocked] = useState(false);
+  const [licensesUnlockToken, setLicensesUnlockToken] = useState<string | null>(null);
   const [showPINLock, setShowPINLock] = useState(false);
 
   // Queue Settings
@@ -102,19 +99,19 @@ export default function AdminSettings() {
   };
 
   const handleTabChange = (value: string) => {
-    if (value === "licenses" && !isLicensesUnlocked) {
+    if (value === "licenses" && !licensesUnlockToken) {
       setShowPINLock(true);
-    } else if (value !== "licenses" && isLicensesUnlocked) {
+    } else if (value !== "licenses" && licensesUnlockToken) {
       // Auto-lock when switching away from Licenses tab
-      setIsLicensesUnlocked(false);
+      setLicensesUnlockToken(null);
       setActiveTab(value);
     } else {
       setActiveTab(value);
     }
   };
 
-  const handlePINUnlock = () => {
-    setIsLicensesUnlocked(true);
+  const handlePINUnlock = (token: string) => {
+    setLicensesUnlockToken(token);
     setShowPINLock(false);
     setActiveTab("licenses");
   };
@@ -122,7 +119,7 @@ export default function AdminSettings() {
   // Auto-lock when component unmounts (navigating away from Settings page)
   useEffect(() => {
     return () => {
-      setIsLicensesUnlocked(false);
+      setLicensesUnlockToken(null);
     };
   }, []);
 
@@ -130,10 +127,9 @@ export default function AdminSettings() {
   return (
     <div className="space-y-4">
       <PINLock
-        _v_={showPINLock}
-        _u_={handlePINUnlock}
-        _c_={() => setShowPINLock(false)}
-        _s_={_c_}
+        open={showPINLock}
+        onUnlock={handlePINUnlock}
+        onClose={() => setShowPINLock(false)}
       />
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
@@ -256,7 +252,9 @@ export default function AdminSettings() {
         </TabsContent>
 
         <TabsContent value="licenses" className="space-y-4">
-          <LicenseManagement />
+          {licensesUnlockToken && (
+            <LicenseManagement unlockToken={licensesUnlockToken} />
+          )}
         </TabsContent>
       </Tabs>
     </div>

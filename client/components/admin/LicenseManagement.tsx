@@ -43,7 +43,7 @@ import type {
   LicenseRecord,
 } from "@shared/api";
 
-export default function LicenseManagement() {
+export default function LicenseManagement({ unlockToken }: { unlockToken: string }) {
   const [licenses, setLicenses] = useState<LicenseRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -86,6 +86,7 @@ export default function LicenseManagement() {
       const response = await fetch("/api/admin/licenses", {
         headers: {
           "X-Requested-With": "XMLHttpRequest",
+          "X-Licenses-Unlock": unlockToken,
         },
       });
 
@@ -121,6 +122,7 @@ export default function LicenseManagement() {
         headers: {
           "Content-Type": "application/json",
           "X-Requested-With": "XMLHttpRequest",
+          "X-Licenses-Unlock": unlockToken,
         },
         body: JSON.stringify({
           licenseKey: formData.licenseKey.trim(),
@@ -169,6 +171,7 @@ export default function LicenseManagement() {
           headers: {
             "Content-Type": "application/json",
             "X-Requested-With": "XMLHttpRequest",
+            "X-Licenses-Unlock": unlockToken,
           },
           body: JSON.stringify({ status: newStatus }),
         },
@@ -204,6 +207,7 @@ export default function LicenseManagement() {
           method: "DELETE",
           headers: {
             "X-Requested-With": "XMLHttpRequest",
+            "X-Licenses-Unlock": unlockToken,
           },
         },
       );

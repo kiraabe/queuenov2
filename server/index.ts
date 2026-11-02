@@ -10,6 +10,8 @@ import {
   listLicensesHandler,
   updateLicenseStatusHandler,
   deleteLicenseHandler,
+  verifyLicensesPinHandler,
+  requireLicensesUnlock,
 } from "./routes/license-management";
 import {
   clearDemo,
@@ -528,23 +530,32 @@ export function createServer() {
 
   // License management endpoints
   app.post(
+    "/api/admin/licenses/verify-pin",
+    requireRole(["admin"]),
+    verifyLicensesPinHandler,
+  );
+  app.post(
     "/api/admin/licenses",
     requireRole(["admin"]),
+    requireLicensesUnlock,
     createLicenseHandler,
   );
   app.get(
     "/api/admin/licenses",
     requireRole(["admin"]),
+    requireLicensesUnlock,
     listLicensesHandler,
   );
   app.put(
     "/api/admin/licenses/:licenseId/status",
     requireRole(["admin"]),
+    requireLicensesUnlock,
     updateLicenseStatusHandler,
   );
   app.delete(
     "/api/admin/licenses/:licenseId",
     requireRole(["admin"]),
+    requireLicensesUnlock,
     deleteLicenseHandler,
   );
 
