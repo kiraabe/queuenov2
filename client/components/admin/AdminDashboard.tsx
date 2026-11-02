@@ -36,6 +36,7 @@ import type {
 } from "@shared/api";
 import MetricTile from "./dashboard/MetricTile";
 import CurrentDisplayCard from "./dashboard/CurrentDisplayCard";
+import DashboardAnalyticsCharts from "./dashboard/DashboardAnalyticsCharts";
 
 interface DashboardStats {
   totalWaiting: number;
@@ -497,6 +498,8 @@ export default function AdminDashboard() {
           {renderMetricGrid(queueMetrics, "md:grid-cols-2 xl:grid-cols-3")}
         </CardContent>
       </Card>
+
+      <DashboardAnalyticsCharts />
 
       {display && <CurrentDisplayCard display={display} tickets={tickets} />}
     </div>
