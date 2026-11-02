@@ -120,9 +120,17 @@ export default function Admin({ section }: AdminProps) {
     },
   ];
 
-  const desktopNavItems = navItems.filter(
-    (item) => item.id !== "settings" && item.id !== "profile",
+  const reportSubItems = navItems.filter((item) =>
+    ["reports", "analytics", "process-flow"].includes(item.id),
   );
+  const isReportsGroup = reportSubItems.some((item) => item.id === section);
+
+  const desktopNavItems = navItems
+    .filter((item) => item.id !== "settings" && item.id !== "profile")
+    .filter((item) => !reportSubItems.includes(item) || item.id === "reports")
+    .map((item) =>
+      item.id === "reports" ? { ...item, label: "Reports & Analytics" } : item,
+    );
 
   const renderContent = () => {
     switch (section) {
@@ -181,24 +189,47 @@ export default function Admin({ section }: AdminProps) {
               <ProfileDropdown navItems={navItems} />
             </div>
 
-            <Tabs
-              value={section}
-              onValueChange={(value) => navigate(`/admin/${value}`)}
-              className="w-full"
-            >
-              <TabsList className="flex h-11 w-full justify-start gap-1 overflow-x-auto">
-                {desktopNavItems.map((item) => (
-                  <TabsTrigger
-                    key={item.id}
-                    value={item.id}
-                    className="group flex flex-1 items-center justify-center gap-2 px-4 h-9"
-                  >
-                    <span className="h-4 w-4 shrink-0">{item.icon}</span>
-                    <span className="font-medium">{item.label}</span>
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
+            <div className="space-y-3">
+              <Tabs
+                value={isReportsGroup ? "reports" : section}
+                onValueChange={(value) => navigate(`/admin/${value}`)}
+                className="w-full"
+              >
+                <TabsList className="flex h-11 w-full justify-start gap-1 overflow-x-auto">
+                  {desktopNavItems.map((item) => (
+                    <TabsTrigger
+                      key={item.id}
+                      value={item.id}
+                      className="group flex flex-1 items-center justify-center gap-2 px-4 h-9"
+                    >
+                      <span className="h-4 w-4 shrink-0">{item.icon}</span>
+                      <span className="font-medium">{item.label}</span>
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
+
+              {isReportsGroup && (
+                <Tabs
+                  value={section}
+                  onValueChange={(value) => navigate(`/admin/${value}`)}
+                  className="w-full"
+                >
+                  <TabsList className="flex h-9 w-full justify-start gap-1 overflow-x-auto bg-muted/50">
+                    {reportSubItems.map((item) => (
+                      <TabsTrigger
+                        key={item.id}
+                        value={item.id}
+                        className="group flex items-center gap-2 px-3 h-7"
+                      >
+                        <span className="h-4 w-4 shrink-0">{item.icon}</span>
+                        <span className="font-medium">{item.label}</span>
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </Tabs>
+              )}
+            </div>
 
             <div className="mt-8 space-y-4">{renderContent()}</div>
           </div>
