@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
@@ -35,7 +36,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Plus, Trash2, Lock, AlertCircle } from "lucide-react";
+import { Plus, Trash2, Lock, AlertCircle, Copy } from "lucide-react";
 import { toast } from "sonner";
 import type {
   ListLicensesResponse,
@@ -53,26 +54,14 @@ export default function LicenseManagement({ unlockToken }: { unlockToken: string
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Generate a random license key
-  const generateLicenseKey = () => {
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    const bytes = crypto.getRandomValues(new Uint8Array(24));
-    const result = Array.from(bytes, (byte) => chars[byte % chars.length]).join("");
-    return result.match(/.{1,4}/gu)?.join("-") ?? result;
-  };
-
-  // Form state for creating license
   const [formData, setFormData] = useState({
-    licenseKey: "",
     licensee: "",
+    expiresOn: "",
+    notes: "",
   });
 
-  // Initialize license key when dialog opens
   const handleDialogOpenChange = (open: boolean) => {
     setIsCreateDialogOpen(open);
-    if (open && !formData.licenseKey) {
-      setFormData({ ...formData, licenseKey: generateLicenseKey() });
-    }
   };
 
   // Load licenses on mount
@@ -125,8 +114,11 @@ export default function LicenseManagement({ unlockToken }: { unlockToken: string
           "X-Licenses-Unlock": unlockToken,
         },
         body: JSON.stringify({
-          licenseKey: formData.licenseKey.trim(),
           licensee: formData.licensee.trim(),
+          expiresAt: formData.expiresOn
+            ? new Date(`${formData.expiresOn}T23:59:59`).getTime()
+            : undefined,
+          notes: formData.notes.trim(),
         }),
       });
 
@@ -139,14 +131,19 @@ export default function LicenseManagement({ unlockToken }: { unlockToken: string
       toast.success("License created successfully");
 
       if (data.license) {
-        downloadLicenseManual(data.license.licenseKey, data.license.licensee);
+        downloadLicenseManual(
+          data.license.licenseKey,
+          data.license.licensee,
+          data.license.expiresAt,
+        );
         await loadLicenses();
       }
 
       // Reset form
       setFormData({
-        licenseKey: "",
         licensee: "",
+        expiresOn: "",
+        notes: "",
       });
       setIsCreateDialogOpen(false);
     } catch (error) {
@@ -156,6 +153,27 @@ export default function LicenseManagement({ unlockToken }: { unlockToken: string
       );
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleCopyLicenseKey = async (licenseId: string) => {
+    try {
+      const response = await fetch(
+        `/api/admin/licenses/${encodeURIComponent(licenseId)}/key`,
+        {
+          headers: {
+            "X-Requested-With": "XMLHttpRequest",
+            "X-Licenses-Unlock": unlockToken,
+          },
+        },
+      );
+      if (!response.ok) throw new Error("Failed to retrieve license key");
+      const data: { licenseKey: string } = await response.json();
+      await navigator.clipboard.writeText(data.licenseKey);
+      toast.success("License key copied");
+    } catch (error) {
+      console.error("Failed to copy license key:", error);
+      toast.error("Failed to copy license key");
     }
   };
 
@@ -224,7 +242,11 @@ export default function LicenseManagement({ unlockToken }: { unlockToken: string
     }
   };
 
-  const downloadLicenseManual = (licenseKey: string, licensee: string) => {
+  const downloadLicenseManual = (
+    licenseKey: string,
+    licensee: string,
+    expiresAt: number | null,
+  ) => {
     const currentDate = new Date().toLocaleDateString("en-US", {
       year: "numeric",
       month: "long",
@@ -266,7 +288,7 @@ License Key: ${licenseKey}
 - Do not share the License Key with unauthorized users
 - Each License Key is unique to ${licensee}
 - Contact support if you have issues activating the license
-- This license is perpetual and does not expire
+- Expiration: ${expiresAt ? new Date(expiresAt).toLocaleDateString("en-US") : "Never"}
 
 ================================================================================
                            SUPPORT INFORMATION
@@ -387,31 +409,9 @@ For technical support or issues with license activation:
             </DialogHeader>
 
             <form onSubmit={handleCreateLicense} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="licenseKey">License Key *</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="licenseKey"
-                    value={formData.licenseKey}
-                    disabled={true}
-                    className="font-mono flex-1"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() =>
-                      setFormData({ ...formData, licenseKey: generateLicenseKey() })
-                    }
-                    disabled={isSubmitting}
-                    className="px-3"
-                  >
-                    Regenerate
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Auto-generated unique identifier. Click regenerate to create a new key.
-                </p>
-              </div>
+              <p className="rounded-md bg-muted p-3 text-sm text-muted-foreground">
+                A secure license key will be generated when you create the license and included in the downloaded manual.
+              </p>
 
               <div className="space-y-2">
                 <Label htmlFor="licensee">Licensee Name *</Label>
@@ -427,6 +427,39 @@ For technical support or issues with license activation:
                 <p className="text-xs text-muted-foreground">
                   Name of the company or organization buying the license.
                 </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="licenseExpiresOn">Expiration date</Label>
+                <Input
+                  id="licenseExpiresOn"
+                  type="date"
+                  min={new Date(
+                    Date.now() - new Date().getTimezoneOffset() * 60000,
+                  ).toISOString().slice(0, 10)}
+                  value={formData.expiresOn}
+                  onChange={(e) =>
+                    setFormData({ ...formData, expiresOn: e.target.value })
+                  }
+                  disabled={isSubmitting}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Leave blank for a license that does not expire.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="licenseNotes">Notes</Label>
+                <Textarea
+                  id="licenseNotes"
+                  value={formData.notes}
+                  onChange={(e) =>
+                    setFormData({ ...formData, notes: e.target.value })
+                  }
+                  maxLength={1000}
+                  placeholder="Internal notes about this license"
+                  disabled={isSubmitting}
+                />
               </div>
 
               <DialogFooter>
@@ -482,6 +515,7 @@ For technical support or issues with license activation:
                   <TableRow>
                     <TableHead>License Key</TableHead>
                     <TableHead>Licensee</TableHead>
+                    <TableHead>Notes</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Expires</TableHead>
                     <TableHead>Created</TableHead>
@@ -494,12 +528,25 @@ For technical support or issues with license activation:
                       <TableCell className="font-mono text-sm">
                         <div className="flex items-center gap-2">
                           <code className="px-2 py-1 rounded bg-muted">
-                            {license.licenseKey}
+                            ••••••••
                           </code>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            aria-label={`Copy key for ${license.licensee}`}
+                            onClick={() => handleCopyLicenseKey(license.id)}
+                          >
+                            <Copy className="mr-1 h-3 w-3" />
+                            Copy
+                          </Button>
                         </div>
                       </TableCell>
                       <TableCell>
                         {license.licensee}
+                      </TableCell>
+                      <TableCell className="max-w-[240px] truncate" title={license.notes ?? undefined}>
+                        {license.notes || "—"}
                       </TableCell>
                       <TableCell>
                         <Badge className={getStatusColor(license.status)}>

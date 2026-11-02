@@ -3,6 +3,7 @@ import { RequestHandler } from "express";
 import { ValidateLicenseResponse } from "@shared/api";
 import {
   createLicenseDb,
+  getLicenseKeyDb,
   listLicensesDb,
   updateLicenseStatusDb,
   deleteLicenseDb,
@@ -84,10 +85,9 @@ export const requireLicensesUnlock: RequestHandler = (req, res, next) => {
 };
 
 interface CreateLicenseRequest {
-  licenseKey: string;
-  licensee: string;
-  expiresAt?: number; // Unix timestamp in ms
-  notes?: string;
+  licensee?: unknown;
+  expiresAt?: unknown;
+  notes?: unknown;
 }
 
 interface CreateLicenseResponse {
@@ -120,31 +120,46 @@ interface DeleteLicenseResponse {
  */
 export const createLicenseHandler: RequestHandler = async (req, res) => {
   try {
-    const { licenseKey, licensee, expiresAt, notes } = req.body as CreateLicenseRequest;
+    const body = (req.body ?? {}) as CreateLicenseRequest;
+    const licensee = typeof body.licensee === "string" ? body.licensee.trim() : "";
+    const notes = typeof body.notes === "string" ? body.notes.trim() : "";
+    const expiresAt = body.expiresAt;
 
-    // Validation
-    if (!licenseKey || !licensee) {
+    if (!licensee || licensee.length > 200) {
       return res.status(400).json({
         success: false,
-        message: "License key and licensee name are required",
+        message: "Enter a licensee name of 1 to 200 characters.",
       });
     }
 
-    if (licenseKey.length < 8) {
+    if (notes.length > 1000) {
       return res.status(400).json({
         success: false,
-        message: "License key must be at least 8 characters long",
+        message: "Notes must be 1000 characters or fewer.",
       });
     }
 
-    // Get user ID from auth context (assuming it's set by middleware)
+    if (
+      expiresAt !== undefined &&
+      expiresAt !== null &&
+      (typeof expiresAt !== "number" ||
+        !Number.isSafeInteger(expiresAt) ||
+        expiresAt <= Date.now())
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Expiration must be a future date.",
+      });
+    }
+
+    const licenseKey = crypto.randomBytes(16).toString("hex").toUpperCase().match(/.{4}/gu)!.join("-");
     const userId = (req as any).userId || null;
 
     const license = await createLicenseDb(
       licenseKey,
       licensee,
       userId,
-      expiresAt || null,
+      (expiresAt as number | null | undefined) ?? null,
       notes || null,
     );
 
@@ -176,6 +191,25 @@ export const createLicenseHandler: RequestHandler = async (req, res) => {
 /**
  * List all licenses
  */
+export const getLicenseKeyHandler: RequestHandler = async (req, res) => {
+  try {
+    const licenseKey = await getLicenseKeyDb(req.params.licenseId);
+    if (!licenseKey) {
+      return res.status(404).json({
+        success: false,
+        message: "License not found",
+      });
+    }
+    res.json({ licenseKey });
+  } catch (error) {
+    console.error("[License Management] Key retrieval error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to retrieve license key",
+    });
+  }
+};
+
 export const listLicensesHandler: RequestHandler = async (req, res) => {
   try {
     const licenses = await listLicensesDb();

@@ -4004,6 +4004,18 @@ export async function getLicenseByKeyDb(licenseKey: string): Promise<LicenseReco
   };
 }
 
+export async function getLicenseKeyDb(licenseId: string): Promise<string | null> {
+  const p = getPool();
+  const res = await p.query(
+    `SELECT license_key FROM licenses WHERE id = $1`,
+    [licenseId],
+  );
+  if (!res.rows[0]) return null;
+
+  const { decryptField } = await import("../services/encryption");
+  return decryptField(res.rows[0].license_key) || res.rows[0].license_key;
+}
+
 export async function updateLicenseMachineIdDb(licenseId: string, machineId: string): Promise<void> {
   const p = getPool();
   await p.query(
@@ -4105,27 +4117,30 @@ export async function listLicensesDb(): Promise<LicenseRecord[]> {
   const res = await p.query(
     `SELECT
        id,
+       license_key as "licenseKeyEncrypted",
        licensee,
        licensee_encrypted as "licenseeEncrypted",
        status,
        extract(epoch from expires_at)*1000 as "expiresAt",
        extract(epoch from created_at)*1000 as "createdAt",
        extract(epoch from updated_at)*1000 as "updatedAt",
-       created_by_user_id as "createdByUserId"
+       created_by_user_id as "createdByUserId",
+       notes,
+       notes_encrypted as "notesEncrypted"
      FROM licenses
      ORDER BY created_at DESC`,
   );
 
   return res.rows.map((record) => ({
     id: record.id,
-    licenseKey: "••••••••",
+    licenseKey: decryptField(record.licenseKeyEncrypted) || record.licenseKeyEncrypted,
     licensee: record.licenseeEncrypted ? decryptField(record.licenseeEncrypted) || record.licensee : record.licensee,
     status: record.status,
     expiresAt: record.expiresAt,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     createdByUserId: record.createdByUserId,
-    notes: null,
+    notes: record.notesEncrypted ? decryptField(record.notesEncrypted) : record.notes,
   }));
 }
 

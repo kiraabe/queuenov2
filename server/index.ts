@@ -8,6 +8,7 @@ import { validateLicenseHandler, checkLicenseStatusHandler } from "./routes/lice
 import {
   createLicenseHandler,
   listLicensesHandler,
+  getLicenseKeyHandler,
   updateLicenseStatusHandler,
   deleteLicenseHandler,
   verifyLicensesPinHandler,
@@ -547,6 +548,12 @@ export function createServer() {
     requireRole(["admin"]),
     requireLicensesUnlock,
     listLicensesHandler,
+  );
+  app.get(
+    "/api/admin/licenses/:licenseId/key",
+    requireRole(["admin"]),
+    requireLicensesUnlock,
+    getLicenseKeyHandler,
   );
   app.put(
     "/api/admin/licenses/:licenseId/status",

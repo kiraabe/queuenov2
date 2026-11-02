@@ -523,9 +523,8 @@ export interface LicenseRecord {
 }
 
 export interface CreateLicenseRequest {
-  licenseKey: string;
   licensee: string;
-  expiresAt?: number; // Unix timestamp in ms
+  expiresAt?: number;
   notes?: string;
 }
 
