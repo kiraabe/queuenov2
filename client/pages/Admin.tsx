@@ -83,12 +83,6 @@ export default function Admin({ section }: AdminProps) {
       path: "/admin/process-flow",
     },
     {
-      id: "employment",
-      label: "Employment",
-      icon: <Briefcase className="h-5 w-5" />,
-      path: "/admin/employment",
-    },
-    {
       id: "sessions",
       label: "Sessions",
       icon: <Users className="h-5 w-5" />,
@@ -105,6 +99,12 @@ export default function Admin({ section }: AdminProps) {
       label: "Windows",
       icon: <MonitorPlay className="h-5 w-5" />,
       path: "/admin/windows",
+    },
+    {
+      id: "employment",
+      label: "Employment",
+      icon: <Briefcase className="h-5 w-5" />,
+      path: "/admin/employment",
     },
     {
       id: "settings",
