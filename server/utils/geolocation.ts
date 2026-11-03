@@ -24,7 +24,7 @@ const regionNames = new Intl.DisplayNames(["en"], { type: "region" });
 const geoCache = new Map<string, { data: GeoLocation; timestamp: number }>();
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
-function isPrivateAddress(ip: string): boolean {
+export function isPrivateAddress(ip: string): boolean {
   const normalized = ip.replace(/^::ffff:/, "");
   if (normalized === "::1" || /^(fc|fd|fe80)/i.test(normalized)) return true;
 
