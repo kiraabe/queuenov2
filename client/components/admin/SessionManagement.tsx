@@ -150,10 +150,19 @@ function LocationCell({ session }: { session: SessionSummary }) {
     <Tooltip>
       <TooltipTrigger asChild>
         <span className="cursor-help">
-          <span>{short}</span>
+          {session.country || session.city ? <span>{short}</span> : null}
           {session.network && (
-            <span className="block text-xs text-muted-foreground">{session.network}</span>
+            <span
+              className={
+                session.country || session.city
+                  ? "block text-xs text-muted-foreground"
+                  : "text-muted-foreground"
+              }
+            >
+              {session.network}
+            </span>
           )}
+          {!session.country && !session.city && !session.network && <span>{short}</span>}
         </span>
       </TooltipTrigger>
       <TooltipContent>
