@@ -1047,6 +1047,18 @@ export const listCaseWorkflows: RequestHandler = async (req, res) => {
     | "month"
     | "all-time";
   const search = String(req.query.search || "").trim().slice(0, 100);
+  const fromDate = req.query.fromDate ? new Date(String(req.query.fromDate)) : null;
+  const toDate = req.query.toDate ? new Date(String(req.query.toDate)) : null;
+  const hasDateRange = fromDate !== null && toDate !== null;
+  if (
+    Boolean(fromDate) !== Boolean(toDate) ||
+    (fromDate && Number.isNaN(fromDate.getTime())) ||
+    (toDate && Number.isNaN(toDate.getTime())) ||
+    (fromDate && toDate && fromDate > toDate)
+  ) {
+    return res.status(400).json({ error: "A valid date range is required" });
+  }
+
   const limit = Math.min(Math.max(Number(req.query.limit || 10), 1), 100);
   const offset = Math.max(Number(req.query.offset || 0), 0);
 
@@ -1063,52 +1075,61 @@ export const listCaseWorkflows: RequestHandler = async (req, res) => {
       dateThreshold = "to_timestamp(0)"; // Unix epoch - includes all records
     }
 
-    // Get count of completed, skipped, serving, and on_hold cases (including those without workflow entries)
-    // For completed: use completed_at date
-    // For skipped: use skipped_at date
-    // For serving/on_hold: use created_at date (since they're still in progress)
+    const dateFilter = hasDateRange
+      ? `(
+          (t.status = 'done' AND t.completed_at >= $2::timestamptz AND t.completed_at <= $3::timestamptz)
+          OR (t.status = 'skipped' AND t.skipped_at >= $2::timestamptz AND t.skipped_at <= $3::timestamptz)
+          OR (t.status IN ('serving', 'on_hold') AND t.created_at >= $2::timestamptz AND t.created_at <= $3::timestamptz)
+        )`
+      : `(
+          (t.status = 'done' AND t.completed_at >= ${dateThreshold})
+          OR (t.status = 'skipped' AND t.skipped_at >= ${dateThreshold})
+          OR (t.status IN ('serving', 'on_hold') AND t.created_at >= ${dateThreshold})
+        )`;
+    const searchCondition = `(
+      $1 = ''
+      OR t.code ILIKE '%' || $1 || '%'
+      OR t.status ILIKE '%' || $1 || '%'
+      OR CASE t.status
+        WHEN 'done' THEN 'completed'
+        WHEN 'on_hold' THEN 'on hold'
+        ELSE t.status
+      END ILIKE '%' || $1 || '%'
+      OR COALESCE(t.owner_name, '') ILIKE '%' || $1 || '%'
+      OR COALESCE(t.service_category, '') ILIKE '%' || $1 || '%'
+      OR COALESCE(t.selected_services::text, '') ILIKE '%' || $1 || '%'
+      OR COALESCE(t.woreda, '') ILIKE '%' || $1 || '%'
+      OR EXISTS (
+        SELECT 1
+        FROM employee_case_performance search_ecp
+        LEFT JOIN users search_user ON search_ecp.employee_id = search_user.id
+        LEFT JOIN job_title search_job ON search_ecp.job_title_id = search_job.id
+        LEFT JOIN job_title search_user_job ON search_user.job_title_id = search_user_job.id
+        WHERE search_ecp.ticket_id = t.id
+          AND (
+            COALESCE(search_user.full_name, '') ILIKE '%' || $1 || '%'
+            OR COALESCE(search_user.username, '') ILIKE '%' || $1 || '%'
+            OR COALESCE(search_job.name_english, search_job.name_amharic, '') ILIKE '%' || $1 || '%'
+            OR COALESCE(search_user_job.name_english, search_user_job.name_amharic, '') ILIKE '%' || $1 || '%'
+          )
+      )
+    )`;
+    const dateParams = hasDateRange
+      ? [fromDate!.toISOString(), toDate!.toISOString()]
+      : [];
+    const baseParams = [search, ...dateParams];
+
     const countRes = await p.query(
       `SELECT COUNT(DISTINCT t.id)::int AS total
        FROM tickets t
        LEFT JOIN employee_case_performance ecp ON t.id = ecp.ticket_id
        WHERE t.status IN ('done', 'skipped', 'serving', 'on_hold')
-         AND (
-           (t.status = 'done' AND t.completed_at >= ${dateThreshold})
-           OR (t.status = 'skipped' AND t.skipped_at >= ${dateThreshold})
-           OR (t.status IN ('serving', 'on_hold') AND t.created_at >= ${dateThreshold})
-         )
-         AND (
-           $1 = ''
-           OR t.code ILIKE '%' || $1 || '%'
-           OR t.status ILIKE '%' || $1 || '%'
-           OR CASE t.status
-             WHEN 'done' THEN 'completed'
-             WHEN 'on_hold' THEN 'on hold'
-             ELSE t.status
-           END ILIKE '%' || $1 || '%'
-           OR COALESCE(t.owner_name, '') ILIKE '%' || $1 || '%'
-           OR COALESCE(t.service_category, '') ILIKE '%' || $1 || '%'
-           OR COALESCE(t.selected_services::text, '') ILIKE '%' || $1 || '%'
-           OR COALESCE(t.woreda, '') ILIKE '%' || $1 || '%'
-           OR EXISTS (
-             SELECT 1
-             FROM employee_case_performance search_ecp
-             LEFT JOIN users search_user ON search_ecp.employee_id = search_user.id
-             LEFT JOIN job_title search_job ON search_ecp.job_title_id = search_job.id
-             LEFT JOIN job_title search_user_job ON search_user.job_title_id = search_user_job.id
-             WHERE search_ecp.ticket_id = t.id
-               AND (
-                 COALESCE(search_user.full_name, '') ILIKE '%' || $1 || '%'
-                 OR COALESCE(search_user.username, '') ILIKE '%' || $1 || '%'
-                 OR COALESCE(search_job.name_english, search_job.name_amharic, '') ILIKE '%' || $1 || '%'
-                 OR COALESCE(search_user_job.name_english, search_user_job.name_amharic, '') ILIKE '%' || $1 || '%'
-               )
-           )
-         )`,
-      [search],
+         AND ${dateFilter}
+         AND ${searchCondition}`,
+      baseParams,
     );
 
-    // Get list of distinct ticket IDs (paginated)
+    const limitOffsetParams = hasDateRange ? "$4 OFFSET $5" : "$2 OFFSET $3";
     const ticketRes = await p.query(
       `SELECT DISTINCT ON (t.id) t.id, t.code, t.status,
               extract(epoch from t.created_at)*1000 as created_at,
@@ -1117,42 +1138,11 @@ export const listCaseWorkflows: RequestHandler = async (req, res) => {
        FROM tickets t
        LEFT JOIN employee_case_performance ecp ON t.id = ecp.ticket_id
        WHERE t.status IN ('done', 'skipped', 'serving', 'on_hold')
-         AND (
-           (t.status = 'done' AND t.completed_at >= ${dateThreshold})
-           OR (t.status = 'skipped' AND t.skipped_at >= ${dateThreshold})
-           OR (t.status IN ('serving', 'on_hold') AND t.created_at >= ${dateThreshold})
-         )
-         AND (
-           $1 = ''
-           OR t.code ILIKE '%' || $1 || '%'
-           OR t.status ILIKE '%' || $1 || '%'
-           OR CASE t.status
-             WHEN 'done' THEN 'completed'
-             WHEN 'on_hold' THEN 'on hold'
-             ELSE t.status
-           END ILIKE '%' || $1 || '%'
-           OR COALESCE(t.owner_name, '') ILIKE '%' || $1 || '%'
-           OR COALESCE(t.service_category, '') ILIKE '%' || $1 || '%'
-           OR COALESCE(t.selected_services::text, '') ILIKE '%' || $1 || '%'
-           OR COALESCE(t.woreda, '') ILIKE '%' || $1 || '%'
-           OR EXISTS (
-             SELECT 1
-             FROM employee_case_performance search_ecp
-             LEFT JOIN users search_user ON search_ecp.employee_id = search_user.id
-             LEFT JOIN job_title search_job ON search_ecp.job_title_id = search_job.id
-             LEFT JOIN job_title search_user_job ON search_user.job_title_id = search_user_job.id
-             WHERE search_ecp.ticket_id = t.id
-               AND (
-                 COALESCE(search_user.full_name, '') ILIKE '%' || $1 || '%'
-                 OR COALESCE(search_user.username, '') ILIKE '%' || $1 || '%'
-                 OR COALESCE(search_job.name_english, search_job.name_amharic, '') ILIKE '%' || $1 || '%'
-                 OR COALESCE(search_user_job.name_english, search_user_job.name_amharic, '') ILIKE '%' || $1 || '%'
-               )
-           )
-         )
+         AND ${dateFilter}
+         AND ${searchCondition}
        ORDER BY t.id, COALESCE(t.completed_at, t.skipped_at, t.created_at) DESC
-       LIMIT $2 OFFSET $3`,
-      [search, limit, offset],
+       LIMIT ${limitOffsetParams}`,
+      [...baseParams, limit, offset],
     );
 
     const ticketIds = ticketRes.rows.map((row) => row.id);

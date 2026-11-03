@@ -59,6 +59,7 @@ type Timeframe = "today" | "week" | "month" | "all-time";
 
 interface CaseWorkflowTrackerProps {
   defaultTimeframe?: Timeframe;
+  dateRange?: { fromDate: Date; toDate: Date };
 }
 
 const formatSeconds = (seconds: number | null) => {
@@ -165,6 +166,7 @@ const convertToProcessSteps = (items: WorkflowEntry[]): ProcessStep[] => {
 
 export default function CaseWorkflowTracker({
   defaultTimeframe = "today",
+  dateRange,
 }: CaseWorkflowTrackerProps = {}) {
   const [workflows, setWorkflows] = useState<CaseWorkflow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -250,6 +252,10 @@ export default function CaseWorkflowTracker({
           limit: String(itemsPerPage),
           offset: String(offset),
         });
+        if (dateRange) {
+          params.set("fromDate", dateRange.fromDate.toISOString());
+          params.set("toDate", dateRange.toDate.toISOString());
+        }
         const workflowsRes = await apiFetch<any>(
           `/api/employee/case-workflows?${params.toString()}`,
         );
@@ -277,7 +283,13 @@ export default function CaseWorkflowTracker({
     return () => {
       isCurrentRequest = false;
     };
-  }, [timeframe, search, currentPage]);
+  }, [
+    timeframe,
+    search,
+    currentPage,
+    dateRange?.fromDate.getTime(),
+    dateRange?.toDate.getTime(),
+  ]);
 
   const totalPages = Math.ceil(totalItems / itemsPerPage);
   const canGoPrevious = currentPage > 1;
@@ -313,7 +325,7 @@ export default function CaseWorkflowTracker({
               <CardDescription className="text-blue-700 dark:text-blue-300 mt-2">
                 Track case workflows for all statuses (Completed, Skipped, Serving, On Hold) from ticket creation through
                 document retrieval by archivers and service delivery by tellers,
-                with timeframe filtering and pagination
+                with {dateRange ? "report period filtering" : "timeframe filtering"} and pagination
               </CardDescription>
             </div>
           </div>
@@ -335,7 +347,7 @@ export default function CaseWorkflowTracker({
                 className="pl-9"
               />
             </div>
-            <div className="flex flex-wrap gap-3">
+            {!dateRange && <div className="flex flex-wrap gap-3">
               {(["today", "week", "month", "all-time"] as Timeframe[]).map(
                 (tf) => (
                   <Button
@@ -358,7 +370,7 @@ export default function CaseWorkflowTracker({
                   </Button>
                 ),
               )}
-            </div>
+            </div>}
           </div>
         </CardContent>
       </Card>

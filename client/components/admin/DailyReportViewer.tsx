@@ -33,6 +33,7 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api";
 import { formatCSVCell, downloadCSVFile } from "@/lib/csv";
+import CaseWorkflowTracker from "@/components/admin/CaseWorkflowTracker";
 
 interface DailyReport {
   reportDate: string;
@@ -173,6 +174,10 @@ export default function DailyReportViewer() {
   const [employeeStats, setEmployeeStats] = useState<EmployeeStats | null>(null);
   const [analytics, setAnalytics] = useState<OverallAnalytics | null>(null);
   const [generatingPDF, setGeneratingPDF] = useState(false);
+  const [reportDateRange, setReportDateRange] = useState<{
+    fromDate: Date;
+    toDate: Date;
+  } | null>(null);
 
   // Date range state
   const [fromDate, setFromDate] = useState<Date | null>(() => {
@@ -241,6 +246,7 @@ export default function DailyReportViewer() {
       });
       console.log("[DailyReportViewer] Full data object:", data);
       setReport(data);
+      setReportDateRange({ fromDate: fromUTC, toDate: toUTC });
     } catch (err) {
       let errorMsg = "Unknown error occurred";
       if (err instanceof Error) {
@@ -512,6 +518,75 @@ export default function DailyReportViewer() {
               <td style="border: 1px solid #ddd; padding: 6px;">${duration}</td>
               <td style="border: 1px solid #ddd; padding: 6px;">${performance}</td>
             </tr>`;
+        });
+        htmlContent += `</table>`;
+      }
+
+      if (reportDateRange) {
+        const workflowParams = new URLSearchParams({
+          timeframe: "all-time",
+          limit: "50",
+          offset: "0",
+          fromDate: reportDateRange.fromDate.toISOString(),
+          toDate: reportDateRange.toDate.toISOString(),
+        });
+        const workflowReport = await apiFetch<{
+          items: Array<{
+            ticketCode: string;
+            status: string;
+            createdAt: number | null;
+            items: Array<{
+              employeeName: string;
+              jobTitle: string;
+              status: string;
+              startedAt: number | null;
+              durationSeconds: number | null;
+              isArchiever?: boolean;
+              isTeller?: boolean;
+            }>;
+          }>;
+          total: number;
+        }>(`/api/employee/case-workflows?${workflowParams.toString()}`);
+
+        htmlContent += `<h2 style="font-size: 18px; font-weight: bold; margin-top: 20px; margin-bottom: 12px;">CASE WORKFLOW TRACKING</h2>
+          <p>Showing ${Math.min(workflowReport.total, workflowReport.items.length)} of ${workflowReport.total} cases for the report period.</p>
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 12px;">
+            <tr style="background-color: #f0f0f0;">
+              <td style="border: 1px solid #ddd; padding: 6px; font-weight: bold;">Ticket #</td>
+              <td style="border: 1px solid #ddd; padding: 6px; font-weight: bold;">Status</td>
+              <td style="border: 1px solid #ddd; padding: 6px; font-weight: bold;">Created</td>
+              <td style="border: 1px solid #ddd; padding: 6px; font-weight: bold;">Workflow Steps</td>
+            </tr>`;
+
+        workflowReport.items.forEach((workflow, index) => {
+          const status = workflow.status === "done"
+            ? "Completed"
+            : workflow.status === "on_hold"
+              ? "On Hold"
+              : workflow.status;
+          const steps = workflow.items.length > 0
+            ? workflow.items.map((step, stepIndex) => {
+                const role = step.isArchiever
+                  ? "Archiver"
+                  : step.isTeller
+                    ? "Teller"
+                    : step.jobTitle;
+                const startedAt = step.startedAt
+                  ? format(new Date(step.startedAt), "MM-dd HH:mm")
+                  : "—";
+                return `${stepIndex + 1}. ${escapeHtml(role)} — ${escapeHtml(step.employeeName)} — ${escapeHtml(step.status)} — ${startedAt} — ${escapeHtml(formatSeconds(step.durationSeconds))}`;
+              }).join("<br/>")
+            : "No workflow steps recorded";
+          const createdAt = workflow.createdAt
+            ? format(new Date(workflow.createdAt), "MM-dd HH:mm")
+            : "—";
+
+          htmlContent += `<tr style="background-color: ${index % 2 === 0 ? "#ffffff" : "#f9f9f9"};">
+            <td style="border: 1px solid #ddd; padding: 6px;">${escapeHtml(workflow.ticketCode)}</td>
+            <td style="border: 1px solid #ddd; padding: 6px;">${escapeHtml(status)}</td>
+            <td style="border: 1px solid #ddd; padding: 6px;">${createdAt}</td>
+            <td style="border: 1px solid #ddd; padding: 6px;">${steps}</td>
+          </tr>`;
         });
         htmlContent += `</table>`;
       }
@@ -884,6 +959,8 @@ export default function DailyReportViewer() {
           )}
         </CardContent>
       </Card>
+
+      {reportDateRange && <CaseWorkflowTracker dateRange={reportDateRange} />}
     </div>
   );
 }
