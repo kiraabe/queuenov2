@@ -79,6 +79,7 @@ const formatSeconds = (seconds: number | null) => {
 interface ProcessStep {
   id: string;
   number: number;
+  employeeId?: string | null;
   employeeName: string;
   jobTitle?: string;
   action: "Started" | "Proceeded" | "Completed" | "Serving" | "On Hold" | "Skipped";
@@ -144,6 +145,7 @@ const convertToProcessSteps = (items: WorkflowEntry[]): ProcessStep[] => {
     return {
       id: item.id,
       number: index + 1,
+      employeeId: item.employeeId,
       employeeName: item.employeeName,
       jobTitle: item.jobTitle,
       action,

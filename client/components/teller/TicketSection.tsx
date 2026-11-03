@@ -444,6 +444,7 @@ function TicketRow({
         steps.push({
           id: item.id,
           number: stepNumber++,
+          employeeId: item.employeeId,
           employeeName: item.employeeName || "Unknown",
           jobTitle: item.jobTitle,
           action: action,

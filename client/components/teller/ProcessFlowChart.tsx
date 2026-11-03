@@ -13,6 +13,7 @@ import {
 interface ProcessStep {
   id: string;
   number: number;
+  employeeId?: string | null;
   employeeName: string;
   jobTitle?: string;
   action: "Started" | "Proceeded" | "Completed" | "Serving" | "On Hold" | "Skipped";
@@ -44,6 +45,9 @@ export function ProcessFlowChart({
   const [holdsLoading, setHoldsLoading] = useState(false);
 
   const selectedStep = steps.find((s) => s.id === selectedStepId);
+  const stepHolds = selectedStep?.employeeId
+    ? holds.filter((hold) => hold.heldByUserId === selectedStep.employeeId)
+    : [];
 
   // Fetch holds for this ticket
   useEffect(() => {
@@ -281,14 +285,14 @@ export function ProcessFlowChart({
       )}
 
       {/* Actions Section - Accordion */}
-      {holds.length > 0 && (
+      {stepHolds.length > 0 && (
         <div className="border-t border-border pt-3">
           <button
             onClick={() => setActionsExpanded(!actionsExpanded)}
             className="flex w-full items-center justify-between rounded-md px-3 py-2 transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <span className="text-xs font-semibold text-foreground">
-              Actions ({holds.length})
+              Actions ({stepHolds.length})
             </span>
             <ChevronDown
               className={`h-4 w-4 text-muted-foreground transition-transform ${
@@ -316,7 +320,7 @@ export function ProcessFlowChart({
                     Loading actions...
                   </div>
                 ) : (
-                  holds.map((hold) => (
+                  stepHolds.map((hold) => (
                     <div
                       key={hold.id}
                       className="grid grid-cols-5 gap-4 px-4 py-3 text-xs hover:bg-muted/40 transition-colors"
@@ -324,6 +328,7 @@ export function ProcessFlowChart({
                       <div className="font-medium text-foreground truncate">
                         {userMap?.get(hold.heldByUserId) ||
                           hold.heldByUserName ||
+                          selectedStep?.employeeName ||
                           "—"}
                       </div>
                       <div className="text-muted-foreground truncate">
