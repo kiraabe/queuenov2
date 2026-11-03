@@ -771,6 +771,14 @@ export const login: RequestHandler = async (req, res) => {
 
   // Extract and clean IP address
   const ipAddress = getClientIpAddress(req);
+  console.log("[DEBUG_IP]", {
+    req_ip: req.ip,
+    socket: req.socket?.remoteAddress,
+    xff: req.headers["x-forwarded-for"],
+    xreal: req.headers["x-real-ip"],
+    cfip: req.headers["cf-connecting-ip"],
+    forwarded: req.headers["forwarded"],
+  });
 
   // Atomic session creation with limit enforcement and race condition prevention
   const sessionResult = await createUserSessionAtomic({
