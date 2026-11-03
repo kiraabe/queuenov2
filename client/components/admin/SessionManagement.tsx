@@ -446,7 +446,6 @@ export default function SessionManagement() {
                               <TableHeader>
                                 <TableRow>
                                   <TableHead>Status</TableHead>
-                                  <TableHead>Window</TableHead>
                                   <TableHead>Device</TableHead>
                                   <TableHead>Browser</TableHead>
                                   <TableHead>OS</TableHead>
@@ -463,9 +462,6 @@ export default function SessionManagement() {
                                   <TableRow key={session.id}>
                                     <TableCell>
                                       <StatusBadge status={session.status} />
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                      {session.windowId ?? "—"}
                                     </TableCell>
                                     <TableCell className="text-sm max-w-[120px] truncate">
                                       <DeviceCell session={session} />
