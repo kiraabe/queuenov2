@@ -1046,6 +1046,7 @@ export const listCaseWorkflows: RequestHandler = async (req, res) => {
     | "week"
     | "month"
     | "all-time";
+  const search = String(req.query.search || "").trim().slice(0, 100);
   const limit = Math.min(Math.max(Number(req.query.limit || 10), 1), 100);
   const offset = Math.max(Number(req.query.offset || 0), 0);
 
@@ -1075,7 +1076,36 @@ export const listCaseWorkflows: RequestHandler = async (req, res) => {
            (t.status = 'done' AND t.completed_at >= ${dateThreshold})
            OR (t.status = 'skipped' AND t.skipped_at >= ${dateThreshold})
            OR (t.status IN ('serving', 'on_hold') AND t.created_at >= ${dateThreshold})
+         )
+         AND (
+           $1 = ''
+           OR t.code ILIKE '%' || $1 || '%'
+           OR t.status ILIKE '%' || $1 || '%'
+           OR CASE t.status
+             WHEN 'done' THEN 'completed'
+             WHEN 'on_hold' THEN 'on hold'
+             ELSE t.status
+           END ILIKE '%' || $1 || '%'
+           OR COALESCE(t.owner_name, '') ILIKE '%' || $1 || '%'
+           OR COALESCE(t.service_category, '') ILIKE '%' || $1 || '%'
+           OR COALESCE(t.selected_services::text, '') ILIKE '%' || $1 || '%'
+           OR COALESCE(t.woreda, '') ILIKE '%' || $1 || '%'
+           OR EXISTS (
+             SELECT 1
+             FROM employee_case_performance search_ecp
+             LEFT JOIN users search_user ON search_ecp.employee_id = search_user.id
+             LEFT JOIN job_title search_job ON search_ecp.job_title_id = search_job.id
+             LEFT JOIN job_title search_user_job ON search_user.job_title_id = search_user_job.id
+             WHERE search_ecp.ticket_id = t.id
+               AND (
+                 COALESCE(search_user.full_name, '') ILIKE '%' || $1 || '%'
+                 OR COALESCE(search_user.username, '') ILIKE '%' || $1 || '%'
+                 OR COALESCE(search_job.name_english, search_job.name_amharic, '') ILIKE '%' || $1 || '%'
+                 OR COALESCE(search_user_job.name_english, search_user_job.name_amharic, '') ILIKE '%' || $1 || '%'
+               )
+           )
          )`,
+      [search],
     );
 
     // Get list of distinct ticket IDs (paginated)
@@ -1092,9 +1122,37 @@ export const listCaseWorkflows: RequestHandler = async (req, res) => {
            OR (t.status = 'skipped' AND t.skipped_at >= ${dateThreshold})
            OR (t.status IN ('serving', 'on_hold') AND t.created_at >= ${dateThreshold})
          )
+         AND (
+           $1 = ''
+           OR t.code ILIKE '%' || $1 || '%'
+           OR t.status ILIKE '%' || $1 || '%'
+           OR CASE t.status
+             WHEN 'done' THEN 'completed'
+             WHEN 'on_hold' THEN 'on hold'
+             ELSE t.status
+           END ILIKE '%' || $1 || '%'
+           OR COALESCE(t.owner_name, '') ILIKE '%' || $1 || '%'
+           OR COALESCE(t.service_category, '') ILIKE '%' || $1 || '%'
+           OR COALESCE(t.selected_services::text, '') ILIKE '%' || $1 || '%'
+           OR COALESCE(t.woreda, '') ILIKE '%' || $1 || '%'
+           OR EXISTS (
+             SELECT 1
+             FROM employee_case_performance search_ecp
+             LEFT JOIN users search_user ON search_ecp.employee_id = search_user.id
+             LEFT JOIN job_title search_job ON search_ecp.job_title_id = search_job.id
+             LEFT JOIN job_title search_user_job ON search_user.job_title_id = search_user_job.id
+             WHERE search_ecp.ticket_id = t.id
+               AND (
+                 COALESCE(search_user.full_name, '') ILIKE '%' || $1 || '%'
+                 OR COALESCE(search_user.username, '') ILIKE '%' || $1 || '%'
+                 OR COALESCE(search_job.name_english, search_job.name_amharic, '') ILIKE '%' || $1 || '%'
+                 OR COALESCE(search_user_job.name_english, search_user_job.name_amharic, '') ILIKE '%' || $1 || '%'
+               )
+           )
+         )
        ORDER BY t.id, COALESCE(t.completed_at, t.skipped_at, t.created_at) DESC
-       LIMIT $1 OFFSET $2`,
-      [limit, offset],
+       LIMIT $2 OFFSET $3`,
+      [search, limit, offset],
     );
 
     const ticketIds = ticketRes.rows.map((row) => row.id);

@@ -8,8 +8,9 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
-import { AlertCircle, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle, Clock } from "lucide-react";
+import { AlertCircle, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle, Clock, Search } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { format } from "date-fns";
 import { ProcessFlowChart } from "../teller/ProcessFlowChart";
@@ -169,6 +170,7 @@ export default function CaseWorkflowTracker({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [timeframe, setTimeframe] = useState<Timeframe>(defaultTimeframe);
+  const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const [serviceStandardTimes, setServiceStandardTimes] = useState<
@@ -235,38 +237,47 @@ export default function CaseWorkflowTracker({
   }, []);
 
   useEffect(() => {
+    let isCurrentRequest = true;
     const fetchWorkflows = async () => {
       try {
         setLoading(true);
         setError(null);
 
         const offset = (currentPage - 1) * itemsPerPage;
+        const params = new URLSearchParams({
+          timeframe,
+          search: search.trim(),
+          limit: String(itemsPerPage),
+          offset: String(offset),
+        });
         const workflowsRes = await apiFetch<any>(
-          `/api/employee/case-workflows?timeframe=${timeframe}&limit=${itemsPerPage}&offset=${offset}`,
+          `/api/employee/case-workflows?${params.toString()}`,
         );
 
-        if (workflowsRes.items && workflowsRes.items.length > 0) {
-          setWorkflows(workflowsRes.items);
+        if (isCurrentRequest) {
+          setWorkflows(workflowsRes.items || []);
           setTotalItems(workflowsRes.total || 0);
-        } else {
-          setError("No cases found for this timeframe");
-          setWorkflows([]);
         }
       } catch (err) {
-        console.error("Failed to fetch workflows:", err);
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Failed to fetch case workflow data",
-        );
-        setWorkflows([]);
+        if (isCurrentRequest) {
+          console.error("Failed to fetch workflows:", err);
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Failed to fetch case workflow data",
+          );
+          setWorkflows([]);
+        }
       } finally {
-        setLoading(false);
+        if (isCurrentRequest) setLoading(false);
       }
     };
 
     fetchWorkflows();
-  }, [timeframe, currentPage]);
+    return () => {
+      isCurrentRequest = false;
+    };
+  }, [timeframe, search, currentPage]);
 
   const totalPages = Math.ceil(totalItems / itemsPerPage);
   const canGoPrevious = currentPage > 1;
@@ -310,6 +321,20 @@ export default function CaseWorkflowTracker({
         <CardContent className="pt-6">
           {/* Timeframe Filter Buttons */}
           <div className="space-y-4">
+            <div className="relative max-w-md">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="search"
+                value={search}
+                onChange={(event) => {
+                  setSearch(event.target.value);
+                  setCurrentPage(1);
+                }}
+                placeholder="Search ticket, service, customer, or staff..."
+                aria-label="Search Process Flow cases"
+                className="pl-9"
+              />
+            </div>
             <div className="flex flex-wrap gap-3">
               {(["today", "week", "month", "all-time"] as Timeframe[]).map(
                 (tf) => (
@@ -361,6 +386,18 @@ export default function CaseWorkflowTracker({
                   Process flow will display once cases are processed (completed, skipped, serving, or on hold)
                 </p>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {!loading && !error && workflows.length === 0 && (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center py-12 text-muted-foreground">
+              {search.trim()
+                ? "No cases match your search and timeframe"
+                : "No cases found for this timeframe"}
             </div>
           </CardContent>
         </Card>
