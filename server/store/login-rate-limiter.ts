@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { getPool } from "./db";
 
 const WINDOW_MINUTES = 10;
-const LOCK_MINUTES = 15;
+const LOCK_MINUTES = 5;
 
 type LoginRateLimitKeys = {
   account: string;
