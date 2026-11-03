@@ -383,6 +383,25 @@ async function recordFailedLogin(req: Request, username: string) {
   return recordLoginFailure(loginRateLimitKeys(req, username));
 }
 
+async function invalidCredentialsResponse(req: Request, res: Response, loginKey: string) {
+  const remainingAttempts = await recordFailedLogin(req, loginKey);
+  if (remainingAttempts <= 0) {
+    const retryAfterSeconds = await loginRetryAfterSeconds(req, loginKey);
+    return res.status(429).json({
+      error: "Too many attempts. Try again later.",
+      message: "Too many attempts. Try again later.",
+      code: "RATE_LIMITED" as any,
+      retryAfterSeconds,
+    });
+  }
+  return res.status(401).json({
+    error: "Invalid username or password",
+    message: "Invalid username or password.",
+    code: "INVALID_CREDENTIALS",
+    remainingAttempts,
+  });
+}
+
 export const login: RequestHandler = async (req, res) => {
   const body = (req.body || {}) as LoginRequest & {
     otp?: string;
@@ -437,12 +456,7 @@ export const login: RequestHandler = async (req, res) => {
   }
 
   if (!userRow) {
-    await recordFailedLogin(req, loginKey);
-    return res.status(401).json({
-      error: "Invalid username or password",
-      message: "Invalid username or password.",
-      code: "INVALID_CREDENTIALS",
-    });
+    return invalidCredentialsResponse(req, res, loginKey);
   }
 
   if (userRow.disabled) {
@@ -455,12 +469,7 @@ export const login: RequestHandler = async (req, res) => {
 
   const passwordMatch = verifyPassword(password, userRow.password_hash);
   if (!passwordMatch) {
-    await recordFailedLogin(req, loginKey);
-    return res.status(401).json({
-      error: "Invalid username or password",
-      message: "Invalid username or password.",
-      code: "INVALID_CREDENTIALS",
-    });
+    return invalidCredentialsResponse(req, res, loginKey);
   }
 
   // Screen width-based role restriction:

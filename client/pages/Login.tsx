@@ -117,12 +117,16 @@ export default function Login() {
 
       navigate(to);
     } catch (err) {
-      const retryAfterSeconds = (err as Error & { retryAfterSeconds?: number })
-        .retryAfterSeconds;
+      const { retryAfterSeconds, remainingAttempts } = err as Error & {
+        retryAfterSeconds?: number;
+        remainingAttempts?: number;
+      };
       if (typeof retryAfterSeconds === "number" && retryAfterSeconds > 0) {
         setNow(Date.now());
         setLockedUntil(Date.now() + retryAfterSeconds * 1000);
         setError(t("login.tooManyAttempts"));
+      } else if (typeof remainingAttempts === "number") {
+        setError(t("login.invalidCredentialsRemaining", { count: remainingAttempts }));
       } else {
         setError(err instanceof Error ? err.message : t("errors.serverError"));
       }

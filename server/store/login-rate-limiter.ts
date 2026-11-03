@@ -3,6 +3,8 @@ import { getPool } from "./db";
 
 const WINDOW_MINUTES = 10;
 const LOCK_MINUTES = 5;
+const ACCOUNT_MAX_ATTEMPTS = 5;
+const IP_MAX_ATTEMPTS = 50;
 
 type LoginRateLimitKeys = {
   account: string;
@@ -32,12 +34,13 @@ export async function getLoginRetryAfterSeconds(keys: LoginRateLimitKeys) {
 }
 
 async function recordFailure(bucketKey: string, threshold: number) {
-  await getPool().query(
+  const { rows } = await getPool().query(
     `INSERT INTO login_rate_limits (bucket_key, attempts, window_started_at, updated_at)
      VALUES ($1, 1, now(), now())
      ON CONFLICT (bucket_key) DO UPDATE SET
        attempts = CASE
          WHEN login_rate_limits.window_started_at <= now() - interval '${WINDOW_MINUTES} minutes' THEN 1
+         WHEN login_rate_limits.attempts + 1 >= $2 THEN 0
          ELSE login_rate_limits.attempts + 1
        END,
        window_started_at = CASE
@@ -50,20 +53,22 @@ async function recordFailure(bucketKey: string, threshold: number) {
          ELSE login_rate_limits.locked_until
        END,
        updated_at = now()
-     RETURNING bucket_key`,
+     RETURNING CASE WHEN locked_until > now() THEN 0 ELSE $2 - attempts END AS remaining`,
     [bucketKey, threshold],
   );
+  return Number(rows[0].remaining);
 }
 
 export async function recordLoginFailure(keys: LoginRateLimitKeys) {
-  await Promise.all([
-    recordFailure(keys.account, 5),
-    recordFailure(keys.ip, 50),
+  const [remainingAttempts] = await Promise.all([
+    recordFailure(keys.account, ACCOUNT_MAX_ATTEMPTS),
+    recordFailure(keys.ip, IP_MAX_ATTEMPTS),
   ]);
   await getPool().query(
     `DELETE FROM login_rate_limits
      WHERE updated_at < now() - interval '1 day'`,
   );
+  return remainingAttempts;
 }
 
 export async function clearLoginAccountFailures(keys: LoginRateLimitKeys) {

@@ -54,7 +54,8 @@
     "invalidCredentials": "Maqaa fayyadamaa ykn jecha darbii dogoggora",
     "sessionLimitReached": "Daangaa fayyadamaa rarra'e bira geessaniittu",
     "accountBlocked": "Herregni keessan uggurameera",
-    "tooManyAttempts": "Yaaliin seenu baay'ee taasifameera. Maaloo booda irra deebi'anii yaalaa"
+    "tooManyAttempts": "Yaaliin seenu baay'ee taasifameera. Maaloo booda irra deebi'anii yaalaa",
+    "invalidCredentialsRemaining": "Maqaa fayyadamaa ykn jecha darbii dogoggora. Yaaliin hafe: {count}"
   },
   "phase1": {
     "title": "Simannaa / Maanajara Dhimmaa",

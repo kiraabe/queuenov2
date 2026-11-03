@@ -54,7 +54,8 @@
     "invalidCredentials": "የተሳሳተ የተጠቃሚ ስም ወይም የይለፍ ቃል",
     "sessionLimitReached": "የአጠቃቀም ገደብ ላይ ደርሰዋል",
     "accountBlocked": "መለያዎ ታግዷል",
-    "tooManyAttempts": "ከመጠን በላይ የመግባት ሙከራ ተደርጓል። እባክዎ ቆይተው እንደገና ይሞክሩ"
+    "tooManyAttempts": "ከመጠን በላይ የመግባት ሙከራ ተደርጓል። እባክዎ ቆይተው እንደገና ይሞክሩ",
+    "invalidCredentialsRemaining": "የተሳሳተ የተጠቃሚ ስም ወይም የይለፍ ቃል። የቀሩ ሙከራዎች: {count}"
   },
   "phase1": {
     "title": "አቀባበል / የጉዳይ ስራ አስኪያጅ",

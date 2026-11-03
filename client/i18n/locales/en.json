@@ -54,7 +54,8 @@
     "invalidCredentials": "Invalid username or password",
     "sessionLimitReached": "Session limit reached",
     "accountBlocked": "Your account is blocked",
-    "tooManyAttempts": "Too many login attempts. Please try again later"
+    "tooManyAttempts": "Too many login attempts. Please try again later",
+    "invalidCredentialsRemaining": "Invalid username or password. {count} attempts remaining"
   },
   "phase1": {
     "title": "Reception / Case Manager",
