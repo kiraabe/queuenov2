@@ -20,16 +20,15 @@ export function getLoginRateLimitKeys(ip: string, username: string): LoginRateLi
   };
 }
 
-export async function isLoginRateLimited(keys: LoginRateLimitKeys) {
+export async function getLoginRetryAfterSeconds(keys: LoginRateLimitKeys) {
   const { rows } = await getPool().query(
-    `SELECT 1
+    `SELECT CEIL(EXTRACT(EPOCH FROM (MAX(locked_until) - now())))::int AS retry_after
      FROM login_rate_limits
      WHERE bucket_key = ANY($1::text[])
-       AND locked_until > now()
-     LIMIT 1`,
+       AND locked_until > now()`,
     [Object.values(keys)],
   );
-  return rows.length > 0;
+  return Number(rows[0]?.retry_after ?? 0);
 }
 
 async function recordFailure(bucketKey: string, threshold: number) {
@@ -58,7 +57,7 @@ async function recordFailure(bucketKey: string, threshold: number) {
 
 export async function recordLoginFailure(keys: LoginRateLimitKeys) {
   await Promise.all([
-    recordFailure(keys.account, 10),
+    recordFailure(keys.account, 5),
     recordFailure(keys.ip, 50),
   ]);
   await getPool().query(

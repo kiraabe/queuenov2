@@ -1,4 +1,4 @@
-import { useState, useId } from "react";
+import { useState, useId, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,6 +34,12 @@ function isSafeRedirect(redirectParam: string, role: string): boolean {
   );
 }
 
+function formatCountdown(totalSeconds: number): string {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function Login() {
@@ -47,7 +53,26 @@ export default function Login() {
   const [showPassword,   setShowPassword]   = useState(false);
   const [error,          setError]          = useState<string | null>(null);
   const [pending,        setPending]        = useState(false);
+  const [lockedUntil,    setLockedUntil]    = useState<number | null>(null);
+  const [now,            setNow]            = useState(() => Date.now());
   const errorId = useId();
+
+  const remainingSeconds = lockedUntil
+    ? Math.max(0, Math.ceil((lockedUntil - now) / 1000))
+    : 0;
+  const isLocked = remainingSeconds > 0;
+
+  useEffect(() => {
+    if (lockedUntil === null) return;
+    const tick = () => {
+      const current = Date.now();
+      setNow(current);
+      if (current >= lockedUntil) setLockedUntil(null);
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [lockedUntil]);
 
   // Capture viewport width once at mount.
   // Reading it at submit time would give the post-resize value.
@@ -92,7 +117,15 @@ export default function Login() {
 
       navigate(to);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("errors.serverError"));
+      const retryAfterSeconds = (err as Error & { retryAfterSeconds?: number })
+        .retryAfterSeconds;
+      if (typeof retryAfterSeconds === "number" && retryAfterSeconds > 0) {
+        setNow(Date.now());
+        setLockedUntil(Date.now() + retryAfterSeconds * 1000);
+        setError(t("login.tooManyAttempts"));
+      } else {
+        setError(err instanceof Error ? err.message : t("errors.serverError"));
+      }
     } finally {
       setPending(false);
     }
@@ -172,9 +205,13 @@ export default function Login() {
 
               <Button
                 type="submit"
-                disabled={pending}
+                disabled={pending || isLocked}
               >
-                {pending ? `${t("login.signIn")}…` : t("login.signIn")}
+                {isLocked
+                  ? `${t("login.signIn")} (${formatCountdown(remainingSeconds)})`
+                  : pending
+                    ? `${t("login.signIn")}…`
+                    : t("login.signIn")}
               </Button>
             </form>
           </CardContent>

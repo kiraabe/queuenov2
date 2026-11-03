@@ -37,7 +37,7 @@ import { broadcastSessionUpdate } from "../services/session-websocket";
 import {
   clearLoginAccountFailures,
   getLoginRateLimitKeys,
-  isLoginRateLimited,
+  getLoginRetryAfterSeconds,
   recordLoginFailure,
 } from "../store/login-rate-limiter";
 
@@ -375,8 +375,8 @@ function normalizeOsDetection(
 
   return { osName, osVersion };
 }
-async function isLocked(req: Request, username: string) {
-  return isLoginRateLimited(loginRateLimitKeys(req, username));
+async function loginRetryAfterSeconds(req: Request, username: string) {
+  return getLoginRetryAfterSeconds(loginRateLimitKeys(req, username));
 }
 
 async function recordFailedLogin(req: Request, username: string) {
@@ -412,21 +412,25 @@ export const login: RequestHandler = async (req, res) => {
   if (isWindowInput) {
     isWindowLogin = true;
     loginKey = `window_${windowId}`;
-    if (await isLocked(req, loginKey)) {
+    const retryAfterSeconds = await loginRetryAfterSeconds(req, loginKey);
+    if (retryAfterSeconds > 0) {
       return res.status(429).json({
         error: "Too many attempts. Try again later.",
         message: "Too many attempts. Try again later.",
         code: "RATE_LIMITED" as any,
+        retryAfterSeconds,
       });
     }
     userRow = await getUserByWindow(windowId);
   } else {
     loginKey = `user_${input}`;
-    if (await isLocked(req, loginKey)) {
+    const retryAfterSeconds = await loginRetryAfterSeconds(req, loginKey);
+    if (retryAfterSeconds > 0) {
       return res.status(429).json({
         error: "Too many attempts. Try again later.",
         message: "Too many attempts. Try again later.",
         code: "RATE_LIMITED" as any,
+        retryAfterSeconds,
       });
     }
     userRow = await getUserByUsername(input);

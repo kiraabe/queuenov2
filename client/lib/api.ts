@@ -280,7 +280,11 @@ export async function apiFetch<T>(
         "An unexpected error occurred. Please try again later.";
     }
 
-    throw new Error(message);
+    const error = new Error(message) as Error & { retryAfterSeconds?: number };
+    if (typeof data?.retryAfterSeconds === "number") {
+      error.retryAfterSeconds = data.retryAfterSeconds;
+    }
+    throw error;
   }
 
   try {
