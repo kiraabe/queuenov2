@@ -11,6 +11,8 @@ export interface GeoLocation {
   region: string | null;
 }
 
+const regionNames = new Intl.DisplayNames(["en"], { type: "region" });
+
 // Cache geolocation lookups for 24 hours to reduce API calls
 const geoCache = new Map<string, { data: GeoLocation; timestamp: number }>();
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
@@ -41,7 +43,7 @@ export async function getGeolocation(ipAddress: string): Promise<GeoLocation> {
 
   try {
     const response = await fetch(
-      `https://api.ipinfo.io/lookup/${encodeURIComponent(ipAddress)}?token=${encodeURIComponent(token)}`,
+      `https://ipinfo.io/${encodeURIComponent(ipAddress)}/json?token=${encodeURIComponent(token)}`,
       { signal: AbortSignal.timeout(3000) },
     );
 
@@ -50,19 +52,17 @@ export async function getGeolocation(ipAddress: string): Promise<GeoLocation> {
     }
 
     const data = (await response.json()) as {
-      geo?: {
-        country?: string;
-        country_code?: string;
-        city?: string;
-        region?: string;
-      };
+      country?: string;
+      city?: string;
+      region?: string;
     };
 
+    const countryCode = data.country || null;
     const geoData: GeoLocation = {
-      country: data.geo?.country || null,
-      countryCode: data.geo?.country_code || null,
-      city: data.geo?.city || null,
-      region: data.geo?.region || null,
+      country: countryCode ? regionNames.of(countryCode) ?? countryCode : null,
+      countryCode,
+      city: data.city || null,
+      region: data.region || null,
     };
 
     // Cache the result
