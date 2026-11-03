@@ -1,4 +1,5 @@
 import { isIP } from "node:net";
+import { describeIp } from "./getClientIp";
 
 export interface GeoLocation {
   country: string | null;
@@ -16,27 +17,11 @@ const EMPTY_GEO: GeoLocation = {
   network: null,
 };
 
-const PRIVATE_NETWORK_LABEL = "Private network";
-
 const regionNames = new Intl.DisplayNames(["en"], { type: "region" });
 
 // Cache geolocation lookups for 24 hours to reduce API calls
 const geoCache = new Map<string, { data: GeoLocation; timestamp: number }>();
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
-
-export function isPrivateAddress(ip: string): boolean {
-  const normalized = ip.replace(/^::ffff:/, "");
-  if (normalized === "::1" || /^(fc|fd|fe80)/i.test(normalized)) return true;
-
-  const [a, b] = normalized.split(".").map(Number);
-  return (
-    a === 10 ||
-    a === 127 ||
-    a === 169 && b === 254 ||
-    a === 172 && b >= 16 && b <= 31 ||
-    a === 192 && b === 168
-  );
-}
 
 /**
  * Look up geolocation and network owner for an IP address
@@ -44,7 +29,8 @@ export function isPrivateAddress(ip: string): boolean {
  */
 export async function getGeolocation(ipAddress: string): Promise<GeoLocation> {
   if (!ipAddress || isIP(ipAddress) === 0) return EMPTY_GEO;
-  if (isPrivateAddress(ipAddress)) return { ...EMPTY_GEO, network: PRIVATE_NETWORK_LABEL };
+  const ipLabel = describeIp(ipAddress);
+  if (ipLabel !== "Public") return { ...EMPTY_GEO, network: ipLabel };
 
   const token = process.env.IPINFO_TOKEN?.trim();
   if (!token) return EMPTY_GEO;

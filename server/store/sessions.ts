@@ -1,7 +1,8 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { DeviceLocation, SessionSummary, UserRole } from "../../shared/api";
 import { getPool, logAudit } from "./db";
-import { getGeolocation, isPrivateAddress, type GeoLocation } from "../utils/geolocation";
+import { getGeolocation, type GeoLocation } from "../utils/geolocation";
+import { describeIp } from "../utils/getClientIp";
 
 export const SESSION_COOKIE = process.env.AUTH_COOKIE_NAME || "queue_session";
 
@@ -372,7 +373,7 @@ function toSummary(
     region: session.region,
     network:
       session.network ??
-      (session.ipAddress && isPrivateAddress(session.ipAddress) ? "Private network" : null),
+      (session.ipAddress && describeIp(session.ipAddress) !== "Public" ? describeIp(session.ipAddress) : null),
     latitude: session.latitude,
     longitude: session.longitude,
     locationAccuracy: session.locationAccuracy,

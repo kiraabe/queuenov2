@@ -8,6 +8,7 @@ import {
   getPool,
 } from "../store/db";
 import { parseCookies, verifyPassword, hashPassword } from "../utils/auth";
+import { getClientIp } from "../utils/getClientIp";
 import type {
   AuthErrorCode,
   AuthUser,
@@ -258,26 +259,8 @@ async function authenticateRequest(
   return { ok: true, session, token };
 }
 
-function getClientIpAddress(req: Request): string {
-  return cleanIpAddress(req.ip || req.socket?.remoteAddress || "");
-}
-
-// Helper function to clean IPv6-mapped IPv4 addresses
-function cleanIpAddress(ip: string): string {
-  if (!ip) return "";
-  // Remove ::ffff: prefix from IPv6-mapped IPv4 addresses
-  if (ip.startsWith("::ffff:")) {
-    return ip.substring(7);
-  }
-  // Remove brackets for IPv6 addresses
-  if (ip.startsWith("[") && ip.endsWith("]")) {
-    return ip.slice(1, -1);
-  }
-  return ip;
-}
-
 function loginRateLimitKeys(req: Request, username: string) {
-  return getLoginRateLimitKeys(getClientIpAddress(req), username);
+  return getLoginRateLimitKeys(getClientIp(req) ?? "", username);
 }
 
 /**
@@ -769,16 +752,7 @@ export const login: RequestHandler = async (req, res) => {
   // Legacy fields for backward compatibility
   const os = `${osName}${osVersion ? ` ${osVersion}` : ""}`.trim();
 
-  // Extract and clean IP address
-  const ipAddress = getClientIpAddress(req);
-  console.log("[DEBUG_IP]", {
-    req_ip: req.ip,
-    socket: req.socket?.remoteAddress,
-    xff: req.headers["x-forwarded-for"],
-    xreal: req.headers["x-real-ip"],
-    cfip: req.headers["cf-connecting-ip"],
-    forwarded: req.headers["forwarded"],
-  });
+  const ipAddress = getClientIp(req);
 
   // Atomic session creation with limit enforcement and race condition prevention
   const sessionResult = await createUserSessionAtomic({
@@ -811,7 +785,7 @@ export const login: RequestHandler = async (req, res) => {
       windowId: userRow.window_id ?? null,
       details: {
         maxSessions: MAX_SESSIONS_PER_USER,
-        ipAddress: getClientIpAddress(req),
+        ipAddress: getClientIp(req),
         device: device,
         browser: browser,
       },
