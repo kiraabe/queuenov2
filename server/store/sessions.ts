@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import type { SessionSummary, UserRole } from "../../shared/api";
+import type { DeviceLocation, SessionSummary, UserRole } from "../../shared/api";
 import { getPool, logAudit } from "./db";
 import { getGeolocation, isPrivateAddress, type GeoLocation } from "../utils/geolocation";
 
@@ -44,6 +44,7 @@ export async function createUserSessionAtomic(params: {
   deviceModel?: string | null;
   browserName?: string | null;
   browserVersion?: string | null;
+  deviceLocation?: DeviceLocation | null;
 }): Promise<
   { token: string; session: SessionRecord } | { error: "MAX_SESSIONS_REACHED" }
 > {
@@ -176,9 +177,12 @@ export async function createUserSessionAtomic(params: {
         network,
         created_at,
         last_activity_at,
-        expires_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $23, now(), now(), $22)
-      RETURNING id, user_id, username, active_role, window_id, job_title_id, token_hash, device, browser, os, ip_address, os_name, os_version, device_vendor, device_model, browser_name, browser_version, created_at, last_activity_at, expires_at, revoked_at, revoke_reason, country, country_code, city, region, network`,
+        expires_at,
+        latitude,
+        longitude,
+        location_accuracy
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $23, now(), now(), $22, $24, $25, $26)
+      RETURNING id, user_id, username, active_role, window_id, job_title_id, token_hash, device, browser, os, ip_address, os_name, os_version, device_vendor, device_model, browser_name, browser_version, created_at, last_activity_at, expires_at, revoked_at, revoke_reason, country, country_code, city, region, network, latitude, longitude, location_accuracy`,
       [
         params.userId,
         params.username,
@@ -203,6 +207,9 @@ export async function createUserSessionAtomic(params: {
         geo.region,
         expiresAt.toISOString(),
         geo.network,
+        params.deviceLocation?.latitude ?? null,
+        params.deviceLocation?.longitude ?? null,
+        params.deviceLocation?.accuracy ?? null,
       ],
     );
     const session = mapRow(rows[0]);
@@ -269,6 +276,9 @@ export interface SessionRecord {
   city: string | null;
   region: string | null;
   network: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  locationAccuracy: number | null;
   mustChangePassword: boolean;
   revokedAt: Date | null;
   revokeReason: SessionRevokeReason | null;
@@ -306,6 +316,9 @@ function mapRow(row: any): SessionRecord {
     city: row.city ?? null,
     region: row.region ?? null,
     network: row.network ?? null,
+    latitude: row.latitude ?? null,
+    longitude: row.longitude ?? null,
+    locationAccuracy: row.location_accuracy ?? null,
     mustChangePassword: row.must_change_password ?? false,
     revokedAt: row.revoked_at ? new Date(row.revoked_at) : null,
     revokeReason: (row.revoke_reason as SessionRevokeReason | null) ?? null,
@@ -360,6 +373,9 @@ function toSummary(
     network:
       session.network ??
       (session.ipAddress && isPrivateAddress(session.ipAddress) ? "Private network" : null),
+    latitude: session.latitude,
+    longitude: session.longitude,
+    locationAccuracy: session.locationAccuracy,
     tabCount: session.tabCount,
     revokeReason: session.revokeReason ?? null,
     fullName: fullName ?? null,
@@ -735,6 +751,7 @@ export async function listSessions(
       us.os_name, us.os_version, us.device_vendor, us.device_model, us.browser_name, us.browser_version,
       us.created_at, us.last_activity_at, us.expires_at, us.revoked_at, us.revoke_reason,
       us.country, us.country_code, us.city, us.region, us.network,
+      us.latitude, us.longitude, us.location_accuracy,
       u.full_name,
       jt.name_english as job_title_english,
       jt.name_amharic as job_title_amharic

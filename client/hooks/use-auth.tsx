@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState } from 
 import { useNavigate } from "react-router-dom";
 import type { AuthUser, LoginResponse, MeResponse } from "@shared/api";
 import { apiFetch, apiUrl } from "@/lib/api";
+import { getDeviceLocation } from "@/lib/device-location";
 
 interface AuthContextValue {
   user: AuthUser | null | undefined; // undefined while loading
@@ -179,6 +180,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         const platformVersion = await getPlatformVersion();
+        const deviceLocation = await getDeviceLocation();
         const res = await apiFetch<LoginResponse>("/api/auth/login", {
           method: "POST",
           body: JSON.stringify({
@@ -187,6 +189,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             role,
             screenWidth: finalScreenWidth,
             platformVersion,
+            deviceLocation,
           }),
         });
         setUser(res.user);

@@ -12,6 +12,7 @@ import type {
   AuthErrorCode,
   AuthUser,
   ListSessionsResponse,
+  DeviceLocation,
   LoginRequest,
   LoginResponse,
   MeResponse,
@@ -402,6 +403,18 @@ async function invalidCredentialsResponse(req: Request, res: Response, loginKey:
   });
 }
 
+function parseDeviceLocation(value: unknown): DeviceLocation | null {
+  if (!value || typeof value !== "object") return null;
+  const { latitude, longitude, accuracy } = value as Record<string, unknown>;
+  if (typeof latitude !== "number" || !Number.isFinite(latitude) || Math.abs(latitude) > 90) return null;
+  if (typeof longitude !== "number" || !Number.isFinite(longitude) || Math.abs(longitude) > 180) return null;
+  return {
+    latitude,
+    longitude,
+    accuracy: typeof accuracy === "number" && Number.isFinite(accuracy) ? accuracy : null,
+  };
+}
+
 export const login: RequestHandler = async (req, res) => {
   const body = (req.body || {}) as LoginRequest & {
     otp?: string;
@@ -777,6 +790,7 @@ export const login: RequestHandler = async (req, res) => {
     deviceModel,
     browserName,
     browserVersion,
+    deviceLocation: parseDeviceLocation(body.deviceLocation),
   });
 
   if ("error" in sessionResult) {

@@ -510,6 +510,15 @@ export async function initDb() {
     await p.query(
       `ALTER TABLE user_sessions ADD COLUMN IF NOT EXISTS network text;`,
     );
+    await p.query(
+      `ALTER TABLE user_sessions ADD COLUMN IF NOT EXISTS latitude double precision;`,
+    );
+    await p.query(
+      `ALTER TABLE user_sessions ADD COLUMN IF NOT EXISTS longitude double precision;`,
+    );
+    await p.query(
+      `ALTER TABLE user_sessions ADD COLUMN IF NOT EXISTS location_accuracy double precision;`,
+    );
     // Migrate from old 'role' column to new 'active_role' column
     try {
       const checkRoleColumn = await p.query(

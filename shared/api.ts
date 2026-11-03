@@ -260,10 +260,16 @@ export interface AuthUser {
   lastLoginAt?: number | null; // time of the current login (ms epoch)
   mustChangePassword?: boolean;
 }
+export interface DeviceLocation {
+  latitude: number;
+  longitude: number;
+  accuracy: number | null;
+}
 export interface LoginRequest {
   username: string;
   password: string;
   screenWidth?: number;
+  deviceLocation?: DeviceLocation | null;
 }
 export interface LoginResponse {
   user: AuthUser;
@@ -313,6 +319,9 @@ export interface SessionSummary {
   city?: string | null;
   region?: string | null;
   network?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  locationAccuracy?: number | null;
   revokeReason?: string | null;
   tabCount?: number;
   fullName?: string | null;

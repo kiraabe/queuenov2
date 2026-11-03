@@ -141,32 +141,40 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 function LocationCell({ session }: { session: SessionSummary }) {
-  const short =
+  const hasCoordinates = session.latitude != null && session.longitude != null;
+  const coordinates = hasCoordinates
+    ? `${session.latitude!.toFixed(5)}, ${session.longitude!.toFixed(5)}`
+    : null;
+  const place =
     session.country && session.city
       ? `${session.country} (${session.city})`
-      : session.country ?? session.city ?? "—";
+      : session.country ?? session.city ?? null;
+  const lines = [coordinates, place, session.network].filter(
+    (line): line is string => Boolean(line),
+  );
+  const [primary, ...secondary] = lines;
 
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <span className="cursor-help">
-          {session.country || session.city ? <span>{short}</span> : null}
-          {session.network && (
-            <span
-              className={
-                session.country || session.city
-                  ? "block text-xs text-muted-foreground"
-                  : "text-muted-foreground"
-              }
-            >
-              {session.network}
+          <span>{primary ?? "—"}</span>
+          {secondary.map((line, index) => (
+            <span key={index} className="block text-xs text-muted-foreground">
+              {line}
             </span>
-          )}
-          {!session.country && !session.city && !session.network && <span>{short}</span>}
+          ))}
         </span>
       </TooltipTrigger>
       <TooltipContent>
         <div className="text-xs space-y-0.5">
+          {coordinates && (
+            <div>
+              Device location: {coordinates}
+              {session.locationAccuracy != null &&
+                ` (±${Math.round(session.locationAccuracy)} m)`}
+            </div>
+          )}
           {session.city && <div>{session.city}</div>}
           {session.region && <div className="text-muted-foreground">{session.region}</div>}
           {session.country && (
@@ -175,7 +183,7 @@ function LocationCell({ session }: { session: SessionSummary }) {
             </div>
           )}
           {session.network && <div className="text-muted-foreground">{session.network}</div>}
-          {!session.city && !session.region && !session.country && !session.network && (
+          {lines.length === 0 && !session.region && (
             <div>Location unavailable</div>
           )}
         </div>
