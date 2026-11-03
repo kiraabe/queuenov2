@@ -49,7 +49,7 @@ const HOLD_EXPIRATION_SECONDS = 72 * 60 * 60; // 72 hours
 export default function TicketManagement() {
   const [tickets, setTickets] = useState<Record<string, Ticket>>({});
   const [searchCode, setSearchCode] = useState("");
-  const [filterStatus, setFilterStatus] = useState<string>("transferred");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [employeeMap, setEmployeeMap] = useState<Record<string, string>>({});
   const [caseHolds, setCaseHolds] = useState<Record<string, any>>({});
