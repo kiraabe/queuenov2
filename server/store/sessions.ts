@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { SessionSummary, UserRole } from "../../shared/api";
 import { getPool, logAudit } from "./db";
-import { getGeolocation } from "../utils/geolocation";
+import { getGeolocation, type GeoLocation } from "../utils/geolocation";
 
 export const SESSION_COOKIE = process.env.AUTH_COOKIE_NAME || "queue_session";
 
@@ -145,7 +145,7 @@ export async function createUserSessionAtomic(params: {
     const expiresAt = new Date(Date.now() + SESSION_MAX_AGE_SECONDS * 1000);
 
     // Look up geolocation for the IP address
-    let geo = { country: null, countryCode: null, city: null, region: null };
+    let geo: GeoLocation = { country: null, countryCode: null, city: null, region: null, network: null };
     if (params.ipAddress) {
       geo = await getGeolocation(params.ipAddress);
     }
@@ -173,11 +173,12 @@ export async function createUserSessionAtomic(params: {
         country_code,
         city,
         region,
+        network,
         created_at,
         last_activity_at,
         expires_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, now(), now(), $22)
-      RETURNING id, user_id, username, active_role, window_id, job_title_id, token_hash, device, browser, os, ip_address, os_name, os_version, device_vendor, device_model, browser_name, browser_version, created_at, last_activity_at, expires_at, revoked_at, revoke_reason, country, country_code, city, region`,
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $23, now(), now(), $22)
+      RETURNING id, user_id, username, active_role, window_id, job_title_id, token_hash, device, browser, os, ip_address, os_name, os_version, device_vendor, device_model, browser_name, browser_version, created_at, last_activity_at, expires_at, revoked_at, revoke_reason, country, country_code, city, region, network`,
       [
         params.userId,
         params.username,
@@ -201,6 +202,7 @@ export async function createUserSessionAtomic(params: {
         geo.city,
         geo.region,
         expiresAt.toISOString(),
+        geo.network,
       ],
     );
     const session = mapRow(rows[0]);
@@ -266,6 +268,7 @@ export interface SessionRecord {
   countryCode: string | null;
   city: string | null;
   region: string | null;
+  network: string | null;
   mustChangePassword: boolean;
   revokedAt: Date | null;
   revokeReason: SessionRevokeReason | null;
@@ -302,6 +305,7 @@ function mapRow(row: any): SessionRecord {
     countryCode: row.country_code ?? null,
     city: row.city ?? null,
     region: row.region ?? null,
+    network: row.network ?? null,
     mustChangePassword: row.must_change_password ?? false,
     revokedAt: row.revoked_at ? new Date(row.revoked_at) : null,
     revokeReason: (row.revoke_reason as SessionRevokeReason | null) ?? null,
@@ -353,6 +357,7 @@ function toSummary(
     countryCode: session.countryCode,
     city: session.city,
     region: session.region,
+    network: session.network,
     tabCount: session.tabCount,
     revokeReason: session.revokeReason ?? null,
     fullName: fullName ?? null,
@@ -727,7 +732,7 @@ export async function listSessions(
       us.token_hash, us.device, us.browser, us.os, us.ip_address, us.tab_count,
       us.os_name, us.os_version, us.device_vendor, us.device_model, us.browser_name, us.browser_version,
       us.created_at, us.last_activity_at, us.expires_at, us.revoked_at, us.revoke_reason,
-      us.country, us.country_code, us.city, us.region,
+      us.country, us.country_code, us.city, us.region, us.network,
       u.full_name,
       jt.name_english as job_title_english,
       jt.name_amharic as job_title_amharic

@@ -312,6 +312,7 @@ export interface SessionSummary {
   countryCode?: string | null;
   city?: string | null;
   region?: string | null;
+  network?: string | null;
   revokeReason?: string | null;
   tabCount?: number;
   fullName?: string | null;

@@ -1,15 +1,22 @@
 import { isIP } from "node:net";
 
-/**
- * Geolocation utility for IP address lookup
- */
-
 export interface GeoLocation {
   country: string | null;
   countryCode: string | null;
   city: string | null;
   region: string | null;
+  network: string | null;
 }
+
+const EMPTY_GEO: GeoLocation = {
+  country: null,
+  countryCode: null,
+  city: null,
+  region: null,
+  network: null,
+};
+
+const PRIVATE_NETWORK_LABEL = "Private network";
 
 const regionNames = new Intl.DisplayNames(["en"], { type: "region" });
 
@@ -17,25 +24,31 @@ const regionNames = new Intl.DisplayNames(["en"], { type: "region" });
 const geoCache = new Map<string, { data: GeoLocation; timestamp: number }>();
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
+function isPrivateAddress(ip: string): boolean {
+  const normalized = ip.replace(/^::ffff:/, "");
+  if (normalized === "::1" || /^(fc|fd|fe80)/i.test(normalized)) return true;
+
+  const [a, b] = normalized.split(".").map(Number);
+  return (
+    a === 10 ||
+    a === 127 ||
+    a === 169 && b === 254 ||
+    a === 172 && b >= 16 && b <= 31 ||
+    a === 192 && b === 168
+  );
+}
+
 /**
- * Look up geolocation data for an IP address
- * Returns cached data if available, otherwise fetches from IPinfo Core
+ * Look up geolocation and network owner for an IP address
+ * Returns cached data if available, otherwise fetches from IPinfo
  */
 export async function getGeolocation(ipAddress: string): Promise<GeoLocation> {
-  if (
-    !ipAddress ||
-    isIP(ipAddress) === 0 ||
-    ipAddress === "127.0.0.1" ||
-    ipAddress === "::1" ||
-    ipAddress.startsWith("::ffff:127.")
-  ) {
-    return { country: null, countryCode: null, city: null, region: null };
-  }
+  if (!ipAddress || isIP(ipAddress) === 0) return EMPTY_GEO;
+  if (isPrivateAddress(ipAddress)) return { ...EMPTY_GEO, network: PRIVATE_NETWORK_LABEL };
 
   const token = process.env.IPINFO_TOKEN?.trim();
-  if (!token) return { country: null, countryCode: null, city: null, region: null };
+  if (!token) return EMPTY_GEO;
 
-  // Check cache
   const cached = geoCache.get(ipAddress);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
     return cached.data;
@@ -55,6 +68,7 @@ export async function getGeolocation(ipAddress: string): Promise<GeoLocation> {
       country?: string;
       city?: string;
       region?: string;
+      org?: string;
     };
 
     const countryCode = data.country || null;
@@ -63,9 +77,9 @@ export async function getGeolocation(ipAddress: string): Promise<GeoLocation> {
       countryCode,
       city: data.city || null,
       region: data.region || null,
+      network: data.org || null,
     };
 
-    // Cache the result
     geoCache.set(ipAddress, { data: geoData, timestamp: Date.now() });
 
     return geoData;
@@ -74,7 +88,6 @@ export async function getGeolocation(ipAddress: string): Promise<GeoLocation> {
       "Geolocation lookup failed:",
       error instanceof Error ? error.name : "Unknown error",
     );
-    // Return null values on failure, don't throw
-    return { country: null, countryCode: null, city: null, region: null };
+    return EMPTY_GEO;
   }
 }

@@ -507,6 +507,9 @@ export async function initDb() {
     await p.query(
       `ALTER TABLE user_sessions ADD COLUMN IF NOT EXISTS region text;`,
     );
+    await p.query(
+      `ALTER TABLE user_sessions ADD COLUMN IF NOT EXISTS network text;`,
+    );
     // Migrate from old 'role' column to new 'active_role' column
     try {
       const checkRoleColumn = await p.query(
