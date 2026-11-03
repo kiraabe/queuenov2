@@ -818,7 +818,7 @@ function WorkflowCard({
                     : "bg-green-50 dark:bg-green-950/50 border-green-200 dark:border-green-800"
                 }`}>
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                    {workflow.status === "on_hold" ? "Time Remaining" : "Total Duration"}
+                    {workflow.status === "on_hold" ? "Time Remaining" : "Elapsed Case Time"}
                   </p>
                   <p className={`text-3xl font-bold mt-2 ${
                     workflow.status === "on_hold"

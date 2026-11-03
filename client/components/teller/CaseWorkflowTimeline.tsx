@@ -281,10 +281,13 @@ export function CaseWorkflowTimeline({
           </div>
           <div>
             <p className="text-xs font-medium text-muted-foreground">
-              Total Duration
+              Combined Step Time
             </p>
             <p className="mt-1 text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
               {formatTime(totalDuration)}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Sum of all recorded step durations
             </p>
           </div>
           <div>

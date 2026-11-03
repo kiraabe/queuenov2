@@ -132,7 +132,7 @@ export function ProcessFlowChart({
       {/* Header */}
       <div className="flex items-center justify-between text-xs">
         <span className="font-semibold text-foreground">
-          Process Flow ({steps.length} steps • {formatTotalTime(totalDuration)})
+          Process Flow ({steps.length} steps • {formatTotalTime(totalDuration)} employee time)
         </span>
       </div>
 
