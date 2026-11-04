@@ -330,8 +330,8 @@ export default function DailyReportViewer() {
       // Build HTML content with proper Amharic font support
       let htmlContent = `
         <div style="font-family: 'Noto Sans Ethiopic', 'Lexend', sans-serif;">
-          <h1 style="font-size: 24px; font-weight: bold; text-align: center;">DAILY QUEUE MANAGEMENT SYSTEM</h1>
-          <h1 style="font-size: 24px; font-weight: bold; text-align: center;">COMPREHENSIVE REPORT</h1>
+          <h1 style="font-size: 24px; font-weight: bold; text-align: center;">STC SOLUTION</h1>
+          <h1 style="font-size: 24px; font-weight: bold; text-align: center;">COMPREHENSIVE QUEUE REPORT</h1>
           <div style="margin: 20px 0; text-align: center;">
             <p style="font-weight: bold; margin: 5px 0;">Report Period: ${escapeHtml(report.reportDate)}</p>
             <p style="font-weight: bold; margin: 5px 0;">Generated: ${format(new Date(report.generatedAt), "PPpp")}</p>
