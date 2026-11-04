@@ -493,7 +493,7 @@ export default function DailyReportViewer() {
           const formatDate = (ts: number | null | undefined) => {
             if (!ts || ts === 0) return "—";
             try {
-              return format(new Date(ts), "MM-dd HH:mm");
+              return format(new Date(ts), "yyyy-MM-dd HH:mm");
             } catch {
               return "—";
             }
@@ -572,13 +572,13 @@ export default function DailyReportViewer() {
                     ? "Teller"
                     : step.jobTitle;
                 const startedAt = step.startedAt
-                  ? format(new Date(step.startedAt), "MM-dd HH:mm")
+                  ? format(new Date(step.startedAt), "yyyy-MM-dd HH:mm")
                   : "—";
                 return `${stepIndex + 1}. ${escapeHtml(role)} — ${escapeHtml(step.employeeName)} — ${escapeHtml(step.status)} — ${startedAt} — ${escapeHtml(formatSeconds(step.durationSeconds))}`;
               }).join("<br/>")
             : "No workflow steps recorded";
           const createdAt = workflow.createdAt
-            ? format(new Date(workflow.createdAt), "MM-dd HH:mm")
+            ? format(new Date(workflow.createdAt), "yyyy-MM-dd HH:mm")
             : "—";
 
           htmlContent += `<tr style="background-color: ${index % 2 === 0 ? "#ffffff" : "#f9f9f9"};">
@@ -637,7 +637,7 @@ export default function DailyReportViewer() {
         </div>
       `;
 
-      tempContainer.innerHTML = htmlContent;
+      tempContainer.innerHTML = `<style>table{border-collapse:collapse}tr{break-inside:avoid;page-break-inside:avoid}thead{display:table-header-group}</style>${htmlContent}`;
       document.body.appendChild(tempContainer);
 
       // Convert to canvas with Amharic font support
@@ -651,27 +651,88 @@ export default function DailyReportViewer() {
 
       document.body.removeChild(tempContainer);
 
-      // Create PDF from canvas
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF({
-        orientation: canvas.width > canvas.height ? "landscape" : "portrait",
-        unit: "mm",
-        format: "a4",
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const pageHeightPx = (canvas.width * pageHeight) / pageWidth;
+      const containerRect = tempContainer.getBoundingClientRect();
+      const scale = canvas.width / containerRect.width;
+      const tableRanges = Array.from(tempContainer.querySelectorAll("table")).map((table) => {
+        const tableRect = table.getBoundingClientRect();
+        const rows = Array.from(table.querySelectorAll("tr")).map((row) => {
+          const rect = row.getBoundingClientRect();
+          return {
+            top: (rect.top - containerRect.top) * scale,
+            bottom: (rect.bottom - containerRect.top) * scale,
+          };
+        });
+        return {
+          top: (tableRect.top - containerRect.top) * scale,
+          bottom: (tableRect.bottom - containerRect.top) * scale,
+          header: rows[0],
+          rows,
+        };
       });
+      let pageTop = 0;
+      let pageNumber = 0;
 
-      const imgWidth = pdf.internal.pageSize.getWidth();
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      let heightLeft = imgHeight;
-      let position = 0;
+      while (pageTop < canvas.height) {
+        const activeTable = tableRanges.find(
+          (table) => pageTop >= table.header.bottom && pageTop < table.bottom,
+        );
+        const repeatedHeaderHeight = activeTable?.header.bottom! - activeTable?.header.top! || 0;
+        const contentLimit = pageTop + pageHeightPx - repeatedHeaderHeight;
+        const rowEnds = tableRanges.flatMap((table) => table.rows.map((row) => row.bottom));
+        const safeBreak = rowEnds
+          .filter((bottom) => bottom > pageTop && bottom <= contentLimit)
+          .sort((a, b) => b - a)[0];
+        const pageBottom = Math.min(
+          canvas.height,
+          safeBreak ?? contentLimit,
+        );
+        const contentHeight = pageBottom - pageTop;
+        const pageCanvas = document.createElement("canvas");
+        pageCanvas.width = canvas.width;
+        pageCanvas.height = Math.ceil(contentHeight + repeatedHeaderHeight);
+        const pageContext = pageCanvas.getContext("2d");
 
-      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-      heightLeft -= pdf.internal.pageSize.getHeight();
+        if (!pageContext) throw new Error("Unable to render PDF page");
+        if (activeTable) {
+          pageContext.drawImage(
+            canvas,
+            0,
+            activeTable.header.top,
+            canvas.width,
+            repeatedHeaderHeight,
+            0,
+            0,
+            canvas.width,
+            repeatedHeaderHeight,
+          );
+        }
+        pageContext.drawImage(
+          canvas,
+          0,
+          pageTop,
+          canvas.width,
+          contentHeight,
+          0,
+          repeatedHeaderHeight,
+          canvas.width,
+          contentHeight,
+        );
 
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-        heightLeft -= pdf.internal.pageSize.getHeight();
+        if (pageNumber > 0) pdf.addPage();
+        pdf.addImage(
+          pageCanvas.toDataURL("image/png"),
+          "PNG",
+          0,
+          0,
+          pageWidth,
+          (pageCanvas.height * pageWidth) / pageCanvas.width,
+        );
+        pageTop = pageBottom;
+        pageNumber++;
       }
 
       const filename = `QueueReport_${report.reportDate.replace(/ /g, "_")}_${format(new Date(), "yyyy-MM-dd_HHmmss")}.pdf`;
@@ -860,13 +921,13 @@ export default function DailyReportViewer() {
                       <TableCell className="text-sm text-muted-foreground">
                         {format(
                           new Date(ticket.startedAt),
-                          "MM-dd HH:mm"
+                          "yyyy-MM-dd HH:mm"
                         )}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {format(
                           new Date(ticket.completedAt),
-                          "MM-dd HH:mm"
+                          "yyyy-MM-dd HH:mm"
                         )}
                       </TableCell>
                       <TableCell className="text-right font-medium">
