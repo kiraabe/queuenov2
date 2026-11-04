@@ -2328,20 +2328,23 @@ export const getCaseHolds: RequestHandler = async (req, res) => {
   const p = getPool();
 
   try {
-    let query = `SELECT id, ticket_id, held_by_user_id, subject, description,
-                        extract(epoch from held_at)*1000 as held_at,
-                        extract(epoch from resumed_at)*1000 as resumed_at,
-                        hold_duration_seconds,
-                        extract(epoch from created_at)*1000 as created_at
-                 FROM case_holds`;
+    let query = `SELECT ch.id, ch.ticket_id, ch.held_by_user_id,
+                        COALESCE(u.full_name, u.username, 'Unknown') as held_by_user_name,
+                        ch.subject, ch.description,
+                        extract(epoch from ch.held_at)*1000 as held_at,
+                        extract(epoch from ch.resumed_at)*1000 as resumed_at,
+                        ch.hold_duration_seconds,
+                        extract(epoch from ch.created_at)*1000 as created_at
+                 FROM case_holds ch
+                 LEFT JOIN users u ON ch.held_by_user_id = u.id`;
     const params: any[] = [];
 
     if (ticketId) {
-      query += ` WHERE ticket_id = $1`;
+      query += ` WHERE ch.ticket_id = $1`;
       params.push(ticketId);
     }
 
-    query += ` ORDER BY held_at DESC`;
+    query += ` ORDER BY ch.held_at DESC`;
 
     const { rows } = await p.query(query, params);
 
@@ -2349,6 +2352,7 @@ export const getCaseHolds: RequestHandler = async (req, res) => {
       id: r.id,
       ticketId: r.ticket_id,
       heldByUserId: r.held_by_user_id,
+      heldByUserName: r.held_by_user_name,
       subject: r.subject,
       description: r.description,
       heldAt: Math.round(Number(r.held_at)),

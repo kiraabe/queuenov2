@@ -648,8 +648,6 @@ export default function DailyReportViewer() {
         logging: false,
       });
 
-      document.body.removeChild(tempContainer);
-
       const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
@@ -672,6 +670,7 @@ export default function DailyReportViewer() {
           rows,
         };
       });
+      document.body.removeChild(tempContainer);
       let pageTop = 0;
       let pageNumber = 0;
 

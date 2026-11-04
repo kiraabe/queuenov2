@@ -10,11 +10,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
-import { AlertCircle, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle, Clock, Search } from "lucide-react";
+import { AlertCircle, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, AlertTriangle, CheckCircle, Clock, Search } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { format } from "date-fns";
 import { ProcessFlowChart } from "../teller/ProcessFlowChart";
-import type { Ticket, CaseHoldsResponse, ServiceItem } from "@shared/api";
+import type { Ticket, CaseHold, CaseHoldsResponse, ServiceItem } from "@shared/api";
 
 interface WorkflowEntry {
   id: string;
@@ -476,7 +476,8 @@ function WorkflowCard({
   serviceStandardTimes: Record<string, number>;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [holdData, setHoldData] = useState<any>(null);
+  const [holdData, setHoldData] = useState<CaseHold[]>([]);
+  const [actionsExpanded, setActionsExpanded] = useState(true);
   const [remainingTime, setRemainingTime] = useState<string>("—");
 
   const HOLD_EXPIRATION_SECONDS = 72 * 60 * 60; // 72 hours
@@ -587,53 +588,48 @@ function WorkflowCard({
 
   // Fetch case hold data for on-hold tickets
   useEffect(() => {
-    if (workflow.status === "on_hold") {
+    if (workflow.status === "on_hold" || isExpanded) {
       const fetchHoldData = async () => {
         try {
-          const response = await apiFetch("/api/employee/holds");
-          const data = response as CaseHoldsResponse;
-          if (data.holds && Array.isArray(data.holds)) {
-            const hold = data.holds.find((h) => h.ticketId === workflow.ticketId);
-            if (hold) {
-              setHoldData(hold);
-            }
-          }
+          const data = await apiFetch<CaseHoldsResponse>(
+            `/api/employee/holds?ticketId=${encodeURIComponent(workflow.ticketId)}`,
+          );
+          setHoldData(data.holds);
         } catch (error) {
           console.error("Failed to fetch hold data:", error);
         }
       };
 
       fetchHoldData();
-      const interval = setInterval(fetchHoldData, 30000); // Refresh every 30 seconds
-      return () => clearInterval(interval);
+      if (workflow.status === "on_hold") {
+        const interval = setInterval(fetchHoldData, 30000);
+        return () => clearInterval(interval);
+      }
     }
-  }, [workflow.ticketId, workflow.status]);
+  }, [workflow.ticketId, workflow.status, isExpanded]);
 
   // Calculate remaining time for holds
   useEffect(() => {
-    if (workflow.status === "on_hold" && holdData) {
+    const activeHold = holdData.find((hold) => !hold.resumedAt);
+    if (workflow.status === "on_hold" && activeHold) {
       const updateCountdown = () => {
-        const now = Date.now();
-        // For active holds (not yet resumed), calculate time remaining until 72-hour expiration
-        if (holdData.heldAt && !holdData.resumedAt) {
-          const expiresAt = holdData.heldAt + HOLD_EXPIRATION_SECONDS * 1000;
-          const remaining = expiresAt - now;
+        const expiresAt = activeHold.heldAt + HOLD_EXPIRATION_SECONDS * 1000;
+        const remaining = expiresAt - Date.now();
 
-          if (remaining > 0) {
-            const hours = Math.floor(remaining / (1000 * 60 * 60));
-            const minutes = Math.floor(
-              (remaining % (1000 * 60 * 60)) / (1000 * 60)
-            );
-            const seconds = Math.floor((remaining % (1000 * 60)) / 1000);
-            setRemainingTime(`${hours}h ${minutes}m ${seconds}s`);
-          } else {
-            setRemainingTime("Expired");
-          }
+        if (remaining > 0) {
+          const hours = Math.floor(remaining / (1000 * 60 * 60));
+          const minutes = Math.floor(
+            (remaining % (1000 * 60 * 60)) / (1000 * 60)
+          );
+          const seconds = Math.floor((remaining % (1000 * 60)) / 1000);
+          setRemainingTime(`${hours}h ${minutes}m ${seconds}s`);
+        } else {
+          setRemainingTime("Expired");
         }
       };
 
       updateCountdown();
-      const interval = setInterval(updateCountdown, 1000); // Update every second
+      const interval = setInterval(updateCountdown, 1000);
       return () => clearInterval(interval);
     }
   }, [holdData, workflow.status]);
@@ -1225,6 +1221,72 @@ function WorkflowCard({
                   </div>
                 );
               })()}
+
+              <div className="mt-4 rounded-lg border bg-card">
+                <div className="flex items-center justify-between border-b bg-muted/40 px-4 py-3">
+                  <h4 className="text-sm font-semibold">
+                    Actions ({holdData.length})
+                  </h4>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    aria-label={actionsExpanded ? "Hide actions" : "Show actions"}
+                    aria-expanded={actionsExpanded}
+                    onClick={() => setActionsExpanded(!actionsExpanded)}
+                  >
+                    {actionsExpanded ? (
+                      <ChevronUp className="h-4 w-4" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+                {actionsExpanded && (holdData.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[640px] text-left text-xs">
+                      <thead className="bg-muted/20 text-muted-foreground">
+                        <tr>
+                          <th className="px-3 py-2 font-medium">Held By</th>
+                          <th className="px-3 py-2 font-medium">Subject</th>
+                          <th className="px-3 py-2 font-medium">Start</th>
+                          <th className="px-3 py-2 font-medium">End</th>
+                          <th className="px-3 py-2 text-right font-medium">Duration</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {holdData.map((hold) => (
+                          <tr key={hold.id} className="border-t">
+                            <td className="px-3 py-2">{hold.heldByUserName || "—"}</td>
+                            <td className="px-3 py-2">{hold.subject}</td>
+                            <td className="px-3 py-2 whitespace-nowrap">
+                              {format(new Date(hold.heldAt), "hh:mm a")}
+                            </td>
+                            <td className="px-3 py-2 whitespace-nowrap">
+                              {hold.resumedAt
+                                ? format(new Date(hold.resumedAt), "hh:mm a")
+                                : "—"}
+                            </td>
+                            <td className="px-3 py-2 text-right whitespace-nowrap">
+                              {formatSeconds(
+                                hold.holdDurationSeconds ??
+                                  (hold.resumedAt
+                                    ? null
+                                    : Math.floor((Date.now() - hold.heldAt) / 1000)),
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="px-4 py-3 text-sm text-muted-foreground">
+                    No actions recorded.
+                  </p>
+                ))}
+              </div>
             </>
           )}
         </div>
