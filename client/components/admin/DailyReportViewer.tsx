@@ -33,7 +33,6 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api";
 import { formatCSVCell, downloadCSVFile } from "@/lib/csv";
-import CaseWorkflowTracker from "@/components/admin/CaseWorkflowTracker";
 
 interface DailyReport {
   reportDate: string;
@@ -1021,7 +1020,6 @@ export default function DailyReportViewer() {
         </CardContent>
       </Card>
 
-      {reportDateRange && <CaseWorkflowTracker dateRange={reportDateRange} />}
     </div>
   );
 }
