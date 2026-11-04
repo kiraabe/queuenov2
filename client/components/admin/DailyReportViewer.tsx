@@ -641,35 +641,36 @@ export default function DailyReportViewer() {
 
       // Convert to canvas with Amharic font support
       const canvas = await html2canvas(tempContainer, {
-        scale: 2,
+        scale: 1.25,
         useCORS: true,
         allowTaint: true,
         backgroundColor: "#ffffff",
         logging: false,
       });
 
-      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
       const pageHeightPx = (canvas.width * pageHeight) / pageWidth;
       const containerRect = tempContainer.getBoundingClientRect();
-      const scale = canvas.width / containerRect.width;
+      const scale = canvas.height / containerRect.height;
       const tableRanges = Array.from(tempContainer.querySelectorAll("table")).map((table) => {
         const tableRect = table.getBoundingClientRect();
         const rows = Array.from(table.querySelectorAll("tr")).map((row) => {
           const rect = row.getBoundingClientRect();
           return {
-            top: (rect.top - containerRect.top) * scale,
-            bottom: (rect.bottom - containerRect.top) * scale,
+            top: Math.floor((rect.top - containerRect.top) * scale),
+            bottom: Math.ceil((rect.bottom - containerRect.top) * scale),
           };
         });
         return {
-          top: (tableRect.top - containerRect.top) * scale,
-          bottom: (tableRect.bottom - containerRect.top) * scale,
+          top: Math.floor((tableRect.top - containerRect.top) * scale),
+          bottom: Math.ceil((tableRect.bottom - containerRect.top) * scale),
           header: rows[0],
           rows,
         };
       });
+      const tableRows = tableRanges.flatMap((table) => table.rows);
       document.body.removeChild(tempContainer);
       let pageTop = 0;
       let pageNumber = 0;
@@ -680,13 +681,16 @@ export default function DailyReportViewer() {
         );
         const repeatedHeaderHeight = activeTable?.header.bottom! - activeTable?.header.top! || 0;
         const contentLimit = pageTop + pageHeightPx - repeatedHeaderHeight;
-        const rowEnds = tableRanges.flatMap((table) => table.rows.map((row) => row.bottom));
-        const safeBreak = rowEnds
+        const safeBreak = tableRows
+          .map((row) => row.bottom)
           .filter((bottom) => bottom > pageTop && bottom <= contentLimit)
           .sort((a, b) => b - a)[0];
+        const nextRowStart = tableRows.find(
+          (row) => row.top > pageTop && row.top < contentLimit && row.bottom > contentLimit,
+        )?.top;
         const pageBottom = Math.min(
           canvas.height,
-          safeBreak ?? contentLimit,
+          safeBreak ?? nextRowStart ?? Math.floor(contentLimit),
         );
         const contentHeight = pageBottom - pageTop;
         const pageCanvas = document.createElement("canvas");
@@ -722,8 +726,8 @@ export default function DailyReportViewer() {
 
         if (pageNumber > 0) pdf.addPage();
         pdf.addImage(
-          pageCanvas.toDataURL("image/png"),
-          "PNG",
+          pageCanvas.toDataURL("image/jpeg", 0.78),
+          "JPEG",
           0,
           0,
           pageWidth,
