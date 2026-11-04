@@ -127,7 +127,7 @@ export async function apiFetch<T>(
         controller.signal.aborted;
 
       // Log network errors for debugging (skip expected timeouts)
-      if (!isTimeoutAbort) {
+      if (!isTimeoutAbort && path !== "/api/session/ping") {
         const errorMsg = err instanceof Error ? err.message : String(err);
         console.warn(
           `[API] Network error for ${opts?.method || "GET"} ${path}: ${errorMsg}`,
@@ -137,9 +137,23 @@ export async function apiFetch<T>(
     }
   };
 
+  const fetchWithHeartbeatRetry = async () => {
+    try {
+      return await doFetch();
+    } catch (error) {
+      const isNetworkFailure =
+        error instanceof TypeError &&
+        /failed to fetch|networkerror|network/i.test(error.message);
+      if (path !== "/api/session/ping" || !isNetworkFailure) throw error;
+
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      return doFetch();
+    }
+  };
+
   let res: Response | null = null;
   try {
-    res = await doFetch();
+    res = await fetchWithHeartbeatRetry();
   } catch (e) {
     // Check if this is a timeout error
     const isTimeoutError =
